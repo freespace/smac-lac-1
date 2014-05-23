@@ -234,7 +234,7 @@ class LAC1(object):
     while dp < 0 or dp is None:
       self.motor_on()
       self.go()
-      self.wait(100)
+      self.wait(200)
       self.stop()
       self.motor_off()
 
