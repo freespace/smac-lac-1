@@ -262,9 +262,11 @@ class LAC1(object):
       # a NOP in the form of NO to pad it out.
       self._sendcmds('MD102,RW538,IB-20,NO,MJ105,RP')
 
-      # if we are here, then we have found the limit. Now forward 100 enconder
-      # counts and define home there
-      self._sendcmds('MD105,ST,WS10,PM,MR1000,GO,WS25,DH0,GH')
+      # if we are here, then we have found the limit. Now forward 1000 enconder
+      # counts and define home there. Finally we turn the motor off because it
+      # seems reasonable to me do do this, but of course if the axis
+      # naturally falls due to gravity this could be a bad idea.
+      self._sendcmds('MD105,ST,WS10,PM,MR1000,GO,WS25,DH0,GH,MF')
 
 
       self._sendcmds('MD0,MC100')
