@@ -22,6 +22,8 @@ SE = 16383
 RI = 1
 FR = 1
 
+ESC = '\033'
+
 class LAC1(object):
   """
   Class to interface with a SMAC LAC-1 module.
@@ -52,11 +54,18 @@ class LAC1(object):
   When set to False, commands that are sent to LAC-1 is printed to stdout.
   Defaults to True.
   """
-  silent = True
+  _silent = True
 
   _port = None
 
-  def __init__(self, port):
+  def __init__(self, port, silent=True, reset=True):
+    """
+    If silent is True, then no debugging output will be printed. Default is
+    True.
+
+    If reset is True, then RT is sent to reset LAC-1. Defaults to True.
+    """
+
     self._port = serial.Serial(
         port = port,
         baudrate = 9600,
@@ -65,11 +74,14 @@ class LAC1(object):
         parity = 'N',
         timeout = 0.1)
 
+    self._silent = silent
+
+    if reset:
+      # reset the controller to a known state
+      self._sendcmds('RT')
+
     # turn off echo, or it will confuse us
     self._sendcmds('EF')
-
-    # turn the motor off just in case
-    self._sendcmds('MF')
 
     # setup some initial parameters
     self._sendcmds(
@@ -148,10 +160,10 @@ class LAC1(object):
     Arguments will be put through str, and no error checking is done. Exception
     to this is if argument is a float, in which case it will be cast to an int.
 
-    After sending each command, the serial stream is consumed until '>' is
-    encountered. This is because SMAC emits '>' when it is ready for another
-    command. Any lines seen before encountering '>' and is not empty will be
-    returned.
+    If the keyword argument wait is True, then after sending each command, the
+    serial stream is consumed until '>' is encountered. This is because SMAC
+    emits '>' when it is ready for another command. Any lines seen before
+    encountering '>' and is not empty will be returned.
 
     LAC-1 Commands
     ==============
@@ -185,7 +197,7 @@ class LAC1(object):
 
     tosend = ','.join(cmds)
 
-    if not self.silent:
+    if not self._silent:
       print 'sent',tosend
 
     self._port.write(tosend)
@@ -194,63 +206,71 @@ class LAC1(object):
     self._port.flush()
 
     datalines = []
-    done = False
-    while not done:
-      #print '_sendcmds, reading'
-      line = self._readline()
-      #print '_sendcmds:',line
-      if line == '>':
-        done = True
-      elif line is not None and len(line):
-        datalines.append(line)
+    wait = kwargs.get('wait', True)
+    if wait:
+      done = False
+      while not done:
+        #print '_sendcmds, reading'
+        line = self._readline()
+        #print '_sendcmds:',line
+        if line == '>':
+          done = True
+        elif line is not None and len(line):
+          datalines.append(line)
 
-    return datalines
+      return datalines
+    else:
+      time.sleep(0.1)
+      return None
 
-  def home(self):
+  def set_home_macro(self, force=False):
     """
-    This function finds home by moving backwards until a limit switch is hit.
+    This function defines a homing macros on macros 100,101,102, and 105. It
+    will also inserts a call to macro 100 in macro 0. This means this routine
+    will be executed on start.
 
-    Note that maximum velocity and maximum acceleration is reset by this
-    call. You need to set them to the desire value after this methods returns.
+    In order for the home function to work, this function must have been called
+    previously, or the homing macro has been defined at macro 100 previously.
+
+    Note that macros persist between power cycles - there is no need to
+    call this every time.
+
+    This function does nothing if TM0 returns a non-zero length string, unless
+    force is True.
     """
-    # we rely on limit switches, so lets enable it
-    self._sendcmds('LN')
 
-    # we want to stop when a limit switch has been activated
-    self._sendcmds('LM0')
-
-    # enter velocity mode
-    self._sendcmds('VM')
-
-    # set direction to go backwards
-    self._sendcmds('DI', 1)
-
-    # set max velocity and acceleration to something small
-    self.set_max_velocity(5)
-    self.set_max_acceleration(20)
-
-    dp = None
-    lastp = self.get_position_enc()
-    while dp < 0 or dp is None:
-      self.motor_on()
-      self.go()
-      self.wait(200)
-      self.stop()
+    macro0 = self._sendcmds('TM0')
+    if len(macro0) == 0 or force:
+      # need motor to be off before messing with macros
       self.motor_off()
 
-      # let the stage relax when it runs into the limit
-      time.sleep(0.1)
+      #reset macros 100,101, and 105
+      self._sendcmds('RM')
 
-      curp = self.get_position_enc()
-      dp = curp - lastp
-      if not self.silent:
-        print curp, lastp, dp
-      lastp = curp
+      # we insert this here because we are executed on startup, and there
+      # will be no PID parameters set.
+      self._sendcmds('MD100,SG50,SI80,SD600,IL5000,FR1,RI1')
 
-    self.move_relative_enc(10)
-    self._sendcmds('DH', 0)
+      # go into velocity mode, turn motor on, set force, acceleration and
+      # velocity constants, set direction to be in the direction of DECREASING
+      # encoder count, start motion, wait 20ms.
+      self._sendcmds('MD101,VM,MN,SQ5000,SA1000,SV50000,DI1,GO,WA20')
 
-    self.motor_off()
+      # read word from memory 538, which is position error. If position error
+      # is greater than 20, jump to macro 105, otherwise repeat.
+      # Note that IB will execute the next 2 commands if true, so we insert
+      # a NOP in the form of NO to pad it out.
+      self._sendcmds('MD102,RW538,IB-20,NO,MJ105,RP')
+
+      # if we are here, then we have found the limit. Now forward 100 enconder
+      # counts and define home there
+      self._sendcmds('MD105,ST,WS10,PM,MR100,GO,WS25,DH0,GH')
+
+
+      self._sendcmds('MD0,MC100')
+
+  def home(self):
+    self._sendcmds('MS100')
 
   def go(self):
     self._sendcmds('GO')
@@ -337,6 +357,8 @@ class LAC1(object):
 
   def close(self):
     if self._port:
+      self._sendcmds(ESC, wait=False)
+      self._sendcmds(ESC, wait=False)
       self.abort()
       self.motor_off()
       self._sendcmds("EN")
@@ -356,10 +378,15 @@ if __name__ == '__main__':
   stage._sendcmds(*sys.argv[2:])
 
 # Tests #####################################################################
+def test_set_home_macro():
+  lac1 = LAC1('/dev/ttyS0', silent=False)
+  lac1.set_home_macro(force=True)
+  p = lac1.get_position_enc()
+  assert abs(p) <= 10, p
+
 def test_home():
-  lac1 = LAC1('/dev/ttyS0')
-  lac1.silent = False
+  lac1 = LAC1('/dev/ttyS0', silent=False)
   lac1.home()
-  print '\n'.join(lac1.get_params())
-  assert(lac1.get_position_enc() == 0)
+  p = lac1.get_position_enc()
+  assert abs(p) <= 10, p
 
