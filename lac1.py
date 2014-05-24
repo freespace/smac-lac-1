@@ -254,7 +254,7 @@ class LAC1(object):
       # go into velocity mode, turn motor on, set force, acceleration and
       # velocity constants, set direction to be in the direction of DECREASING
       # encoder count, start motion, wait 20ms.
-      self._sendcmds('MD101,VM,MN,SQ5000,SA1000,SV50000,DI1,GO,WA20')
+      self._sendcmds('MD101,VM,MN,SQ7000,SA1000,SV60000,DI1,GO,WA20')
 
       # read word from memory 538, which is position error. If position error
       # is greater than 20, jump to macro 105, otherwise repeat.
@@ -264,7 +264,7 @@ class LAC1(object):
 
       # if we are here, then we have found the limit. Now forward 100 enconder
       # counts and define home there
-      self._sendcmds('MD105,ST,WS10,PM,MR100,GO,WS25,DH0,GH')
+      self._sendcmds('MD105,ST,WS10,PM,MR1000,GO,WS25,DH0,GH')
 
 
       self._sendcmds('MD0,MC100')
