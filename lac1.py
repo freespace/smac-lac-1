@@ -6,7 +6,11 @@ import time
 ENC_COUNTS_PER_MM = 1000.0  # encoder counts per mm
 SERVO_LOOP_FREQ = 5000.0    # servo loop frequency
 
+# This is specific to the stage I am using
+# TODO Implement range checking for safety?
 STAGE_TRAVEL_MM = 25
+STAGE_TRAVEL_UM = STAGE_TRAVEL_MM*1000
+STAGE_TRAVEL_ENC = STAGE_TRAVEL_MM * ENC_COUNTS_PER_MM
 
 # KV and KA defined the change in encoder per servo loop needed to achieve
 # 1 mm/s velocity and 1 mm/s/s acceleration, respectively.
@@ -58,33 +62,26 @@ class LAC1(object):
 
   _port = None
 
-  def __init__(self, port, silent=True, reset=True):
+  def __init__(self, port, silent=True, reset=True, baudRate=9600):
     """
     If silent is True, then no debugging output will be printed. Default is
     True.
 
-    If reset is True, then RT is sent to reset LAC-1. Defaults to True.
+    baudRate defaults to 9600
     """
 
     self._port = serial.Serial(
         port = port,
-        baudrate = 9600,
+        baudrate = baudRate,
         bytesize = 8,
         stopbits = 1,
         parity = 'N',
-        timeout = 0.1)
+        timeout = 0.01)
 
     self._silent = silent
 
-    if reset:
-      # reset the controller to a known state
-      self._sendcmds('RT')
-
-    # turn off echo, or it will confuse us
-    self._sendcmds('EF')
-
     # setup some initial parameters
-    self._sendcmds(
+    self.sendcmds(
         'SG', SG,
         'SI', SI,
         'SD', SD,
@@ -113,13 +110,15 @@ class LAC1(object):
     I am glad you asked.
 
     With python < 2.6, pySerial uses serial.FileLike, that provides a readline
-    that accepts the max number of chars to read, and the end of line character.
+    that accepts the max number of chars to read, and the end of line
+    character.
 
-    With python >= 2.6, pySerial uses io.RawIOBase, whose readline only accepts
-    the max number of chars to read. io.RawIOBase does support the idea of a
-    end of line character, but it is an attribute on the instance, which makes
-    sense... except pySerial doesn't pass the newline= keyword argument
-    along to the underlying class, and so you can't actually change it.
+    With python >= 2.6, pySerial uses io.RawIOBase, whose readline only
+    accepts the max number of chars to read. io.RawIOBase does support the
+    idea of a end of line character, but it is an attribute on the instance,
+    which makes sense... except pySerial doesn't pass the newline= keyword
+    argument along to the underlying class, and so you can't actually change
+    it.
     """
     done = False
     line = str()
@@ -144,7 +143,13 @@ class LAC1(object):
     #print 'read: "%s"'%(line)
     return line
 
-  def _sendcmds(self, *args, **kwargs):
+  def flush_input_buffer(self):
+    """
+    Flushes the serial input buffer, discarding all results
+    """
+    self._port.flushInput()
+
+  def sendcmds(self, *args, **kwargs):
     """
     This method sends the given commands and argument to LAC-1. Commands are
     expected in the order of
@@ -157,13 +162,19 @@ class LAC1(object):
 
     If a command takes no argument, then put None or ''.
 
-    Arguments will be put through str, and no error checking is done. Exception
-    to this is if argument is a float, in which case it will be cast to an int.
+    Arguments will be put through str, and no error checking is done.
+    Exception to this is if argument is a float, in which case it will be cast
+    to an int.
 
     If the keyword argument wait is True, then after sending each command, the
     serial stream is consumed until '>' is encountered. This is because SMAC
     emits '>' when it is ready for another command. Any lines seen before
-    encountering '>' and is not empty will be returned.
+    encountering '>' and is not empty will be returned. wait is True by
+    default
+
+    If the keyword argument callback is not None, and wait is True, then
+    after reading each line from the LAC-1, the callback will be invoked
+    with the contents of the line.
 
     LAC-1 Commands
     ==============
@@ -200,6 +211,10 @@ class LAC1(object):
     if not self._silent:
       print 'sent',tosend
 
+    # clear any characters in the current input in case a previous sendcmds
+    # didn't clean up properly
+    self._port.flushInput()
+
     self._port.write(tosend)
     self._port.write('\r')
 
@@ -207,18 +222,26 @@ class LAC1(object):
 
     datalines = []
     wait = kwargs.get('wait', True)
+    callbackfunc = kwargs.get('callback', None)
+
     if wait:
       done = False
       while not done:
-        #print '_sendcmds, reading'
+        #print 'sendcmds, reading'
         line = self._readline()
-        #print '_sendcmds:',line
+        #print 'sendcmds:',line
         if line == '>':
           done = True
         elif line is not None and len(line):
+          if callbackfunc is not None:
+            callbackfunc(line)
           datalines.append(line)
 
-      return datalines
+      # ignore the first line which is repeat of what we sent due to echo
+      # been on by default.
+      # XXX I don't try to disable echo because I can't seem to turn it off
+      # reliably.
+      return datalines[1:]
     else:
       time.sleep(0.1)
       return None
@@ -229,8 +252,9 @@ class LAC1(object):
     will also inserts a call to macro 100 in macro 0. This means this routine
     will be executed on start.
 
-    In order for the home function to work, this function must have been called
-    previously, or the homing macro has been defined at macro 100 previously.
+    In order for the home() function to work, this function must have been
+    called previously, or the homing macro has been defined at macro 100
+    previously.
 
     Note that macros persist between power cycles - there is no need to
     call this every time.
@@ -239,76 +263,76 @@ class LAC1(object):
     force is True.
     """
 
-    macro0 = self._sendcmds('TM0')
+    macro0 = self.sendcmds('TM0')
     if len(macro0) == 0 or force:
       # need motor to be off before messing with macros
       self.motor_off()
 
       #reset macros 100,101, and 105
-      self._sendcmds('RM')
+      self.sendcmds('RM')
 
       # we insert this here because we are executed on startup, and there
       # will be no PID parameters set.
-      self._sendcmds('MD100,SG50,SI80,SD600,IL5000,FR1,RI1')
+      self.sendcmds('MD100,SG50,SI80,SD600,IL5000,FR1,RI1')
 
       # go into velocity mode, turn motor on, set force, acceleration and
       # velocity constants, set direction to be in the direction of DECREASING
       # encoder count, start motion, wait 20ms.
-      self._sendcmds('MD101,VM,MN,SQ7000,SA1000,SV60000,DI1,GO,WA20')
+      self.sendcmds('MD101,VM,MN,SQ7000,SA1000,SV60000,DI1,GO,WA20')
 
       # read word from memory 538, which is position error. If position error
       # is greater than 20, jump to macro 105, otherwise repeat.
       # Note that IB will execute the next 2 commands if true, so we insert
       # a NOP in the form of NO to pad it out.
-      self._sendcmds('MD102,RW538,IB-20,NO,MJ105,RP')
+      self.sendcmds('MD102,RW538,IB-20,NO,MJ105,RP')
 
       # if we are here, then we have found the limit. Now forward 1000 enconder
       # counts and define home there. Finally we turn the motor off because it
       # seems reasonable to me do do this, but of course if the axis
       # naturally falls due to gravity this could be a bad idea.
-      self._sendcmds('MD105,ST,WS10,PM,MR1000,GO,WS25,DH0,GH,MF')
+      self.sendcmds('MD105,ST,WS10,PM,MR1000,GO,WS25,DH0,GH,MF')
 
 
-      self._sendcmds('MD0,MC100')
+      self.sendcmds('MD0,MC100')
 
   def home(self):
-    self._sendcmds('MS100')
+    self.sendcmds('MS100')
 
   def go(self):
-    self._sendcmds('GO')
+    self.sendcmds('GO')
 
   def stop(self):
-    self._sendcmds('ST')
+    self.sendcmds('ST')
 
   def abort(self):
-    self._sendcmds('AB')
+    self.sendcmds('AB')
 
   def motor_on(self):
-    self._sendcmds('MN')
+    self.sendcmds('MN')
 
   def motor_off(self):
-    self._sendcmds('MF')
+    self.sendcmds('MF')
 
   def go_home(self):
-    self._sendcmds('MN','','GH', '')
+    self.sendcmds('MN','','GH', '')
 
   def set_max_velocity(self, mmpersecond):
-    self._sendcmds('SV', KV*mmpersecond)
+    self.sendcmds('SV', KV*mmpersecond)
 
   def set_max_acceleration(self, mmpersecondpersecond):
-    self._sendcmds('SA',KA*mmpersecondpersecond)
+    self.sendcmds('SA',KA*mmpersecondpersecond)
 
   def wait_stop(self):
-    self._sendcmds('WS', 10)
+    self.sendcmds('WS', 10)
 
   def wait(self, interval_ms):
-    self._sendcmds('WA', interval_ms)
+    self.sendcmds('WA', interval_ms)
 
   def move_absolute_enc(self, pos_enc, wait=True):
     """
     Move to a position specified in encoder counts
     """
-    self._sendcmds('PM', '', 'MN', '', 'MA', pos_enc,'GO','')
+    self.sendcmds('PM', '', 'MN', '', 'MA', pos_enc,'GO','')
     if wait:
       self.wait_stop()
 
@@ -316,11 +340,11 @@ class LAC1(object):
     self.move_absolute_enc(pos_mm * ENC_COUNTS_PER_MM, **kwargs)
 
   def move_absolute_um(self, pos_um, **kwargs):
-    self.move_absolute_enc(1000 * pos_mm * ENC_COUNTS_PER_MM, **kwargs)
+    self.move_absolute_enc(1000 * pos_um * ENC_COUNTS_PER_MM, **kwargs)
 
 
   def move_relative_enc(self, dist_enc, wait=True):
-    self._sendcmds('PM', '', 'MN', '', 'MR', dist_enc, 'GO', '')
+    self.sendcmds('PM', '', 'MN', '', 'MR', dist_enc, 'GO', '')
 
     if wait:
       self.wait_stop()
@@ -332,14 +356,14 @@ class LAC1(object):
     """
     Asks LAC-1 for the last error
     """
-    error = self._sendcmds('TE', eat_prompt=False)
+    error = self.sendcmds('TE', eat_prompt=False)
     return error[0]
 
   def get_position_enc(self):
     """
     Returns the current position in encoder counts
     """
-    pos = self._sendcmds('TP')
+    pos = self.sendcmds('TP')
     return int(pos[0])
 
   def get_position_mm(self):
@@ -355,15 +379,15 @@ class LAC1(object):
     """
     paramset is 0...n
     """
-    return self._sendcmds('TK', paramset)
+    return self.sendcmds('TK', paramset)
 
   def close(self):
     if self._port:
-      self._sendcmds(ESC, wait=False)
-      self._sendcmds(ESC, wait=False)
+      self.sendcmds(ESC, wait=False)
+      self.sendcmds(ESC, wait=False)
       self.abort()
       self.motor_off()
-      self._sendcmds("EN")
+      self.sendcmds("EN")
       self._port.close()
       self._port = None
 
@@ -377,7 +401,7 @@ if __name__ == '__main__':
     sys.exit(1)
 
   stage = LAC1(sys.argv[1])
-  stage._sendcmds(*sys.argv[2:])
+  stage.sendcmds(*sys.argv[2:])
 
 # Tests #####################################################################
 def test_set_home_macro():
