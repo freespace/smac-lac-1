@@ -273,26 +273,64 @@ class LAC1(object):
 
       # we insert this here because we are executed on startup, and there
       # will be no PID parameters set.
-      self.sendcmds('MD100,SG50,SI80,SD600,IL5000,FR1,RI1')
+      #
+      # MD: define macro
+      # SG: proportional param
+      # SI: integral param
+      # SD: derivative param
+      # IL: integral limit
+      # FR: derivative sampling frequency
+      # RI: sampling rate of integral
+      self.sendcmds('MD100,SG50,SI80,SD700,IL5000,FR1,RI1')
 
       # go into velocity mode, turn motor on, set force, acceleration and
       # velocity constants, set direction to be in the direction of DECREASING
       # encoder count, start motion, wait 20ms.
-      self.sendcmds('MD101,VM,MN,SQ7000,SA1000,SV60000,DI1,GO,WA20')
+      #
+      # MD: define macro
+      # VM: velocity mode
+      # MN: motor on
+      # SQ: torque
+      # SA: acceleration
+      # SV: velocity
+      # DI: direction
+      # GO: begin movement
+      # WA: wait
+      self.sendcmds('MD101,VM,MN,SQ20000,SA30000,SV50000,DI1,GO,WA20')
 
       # read word from memory 538, which is position error. If position error
-      # is greater than 20, jump to macro 105, otherwise repeat.
+      # is greater than 50, jump to macro 105, otherwise repeat.
       # Note that IB will execute the next 2 commands if true, so we insert
       # a NOP in the form of NO to pad it out.
-      self.sendcmds('MD102,RW538,IB-20,NO,MJ105,RP')
+      #
+      # MD: define macro
+      # RW: read word from memory 538, where position error is stored
+      # IB: if below
+      # NO: nop
+      # MJ: jump to macro
+      # RP: repeat
+      self.sendcmds('MD102,RW538,IB-50,NO,MJ105,RP')
 
       # if we are here, then we have found the limit. Now forward 1000 enconder
       # counts and define home there. Finally we turn the motor off because it
       # seems reasonable to me do do this, but of course if the axis
       # naturally falls due to gravity this could be a bad idea.
-      self.sendcmds('MD105,ST,WS10,PM,MR1000,GO,WS25,DH0,GH,MF')
+      #
+      # MD: define macro
+      # ST: stop
+      # WS: wait stop
+      # PM: position mode
+      # MR: move relative
+      # GO: start motion
+      # WS: wait stop
+      # DH: define home
+      # GH: go home
+      # MF: motor off
+      self.sendcmds('MD105,ST,WS25,PM,MR1000,GO,WS25,DH0,GH,MF')
 
 
+      # MD: define macro
+      # MC: call macro
       self.sendcmds('MD0,MC100')
 
   def home(self):
@@ -314,6 +352,10 @@ class LAC1(object):
     self.sendcmds('MF')
 
   def go_home(self):
+    """
+    This differs from home in that it doesn't block and uses GH instead
+    of calling the home macro
+    """
     self.sendcmds('MN','','GH', '')
 
   def set_max_velocity(self, mmpersecond):
@@ -321,6 +363,13 @@ class LAC1(object):
 
   def set_max_acceleration(self, mmpersecondpersecond):
     self.sendcmds('SA',KA*mmpersecondpersecond)
+
+  def set_max_torque(self, q):
+    """
+    I don't know what units this is in, the instructions don't say
+    so it just do it via trial and error
+    """
+    self.sendcmds('SQ',q)
 
   def wait_stop(self):
     self.sendcmds('WS', 10)
