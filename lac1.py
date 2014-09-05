@@ -61,14 +61,15 @@ class LAC1(object):
 
   _port = None
 
-  def __init__(self, port, silent=True, reset=True, baudRate=9600):
+  _ESC = '\033'
+
+  def __init__(self, port, baudRate, silent=True, reset=True):
     """
     If silent is True, then no debugging output will be printed. Default is
     True.
-
-    baudRate defaults to 9600
     """
 
+    print 'Connecting to LAC-1 on %s (%s)'%(port, baudRate)
     self._port = serial.Serial(
         port = port,
         baudrate = baudRate,
@@ -395,22 +396,23 @@ class LAC1(object):
 
 if __name__ == '__main__':
   import sys
-  if len(sys.argv) < 3:
-    print 'Usage: %s <serial port> <commands and arguments>'%(sys.argv[0])
+  if len(sys.argv) < 4:
+    print 'Usage: %s <serial port> <baud> <commands and arguments>'%(sys.argv[0])
     sys.exit(1)
 
-  stage = LAC1(sys.argv[1])
-  stage.sendcmds(*sys.argv[2:])
+  stage = LAC1(sys.argv[1], baudRate=int(sys.argv[2]))
+  stage.sendcmds(*sys.argv[3:])
 
 # Tests #####################################################################
 def test_set_home_macro():
-  lac1 = LAC1('/dev/ttyS0', silent=False)
+  lac1 = LAC1('/dev/ttyS0', 19200, silent=False)
   lac1.set_home_macro(force=True)
+  lac1.home()
   p = lac1.get_position_enc()
   assert abs(p) <= 10, p
 
 def test_home():
-  lac1 = LAC1('/dev/ttyS0', silent=False)
+  lac1 = LAC1('/dev/ttyS0', 19200, silent=False)
   lac1.home()
   p = lac1.get_position_enc()
   assert abs(p) <= 10, p
