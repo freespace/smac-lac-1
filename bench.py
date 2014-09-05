@@ -9,11 +9,11 @@ lac1.set_max_acceleration(30000)
 #lac1.set_max_acceleration(5000)
 
 import time
-starttime = time.time()
 nloops = 50
 dist = 5
 
 lac1.move_absolute_mm(0)
+starttime = time.time()
 for cnt in xrange(nloops):
   lac1.move_absolute_mm(dist)
   lac1.move_absolute_mm(0)
