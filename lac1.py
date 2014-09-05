@@ -26,7 +26,6 @@ SE = 16383
 RI = 1
 FR = 1
 
-ESC = '\033'
 
 class LAC1(object):
   """
@@ -383,8 +382,8 @@ class LAC1(object):
 
   def close(self):
     if self._port:
-      self.sendcmds(ESC, wait=False)
-      self.sendcmds(ESC, wait=False)
+      self.sendcmds(self._ESC, wait=False)
+      self.sendcmds(self._ESC, wait=False)
       self.abort()
       self.motor_off()
       self.sendcmds("EN")
