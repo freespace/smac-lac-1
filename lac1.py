@@ -268,7 +268,7 @@ class LAC1(object):
       # need motor to be off before messing with macros
       self.motor_off()
 
-      #reset macros 100,101, and 105
+      # reset ALL macros
       self.sendcmds('RM')
 
       # we insert this here because we are executed on startup, and there
@@ -296,10 +296,10 @@ class LAC1(object):
       # DI: direction
       # GO: begin movement
       # WA: wait
-      self.sendcmds('MD101,VM,MN,SQ20000,SA30000,SV50000,DI1,GO,WA20')
+      self.sendcmds('MD101,VM,MN,SQ30000,SA30000,SV50000,DI1,GO,WA20')
 
       # read word from memory 538, which is position error. If position error
-      # is greater than 50, jump to macro 105, otherwise repeat.
+      # is greater than 75, jump to macro 105, otherwise repeat.
       # Note that IB will execute the next 2 commands if true, so we insert
       # a NOP in the form of NO to pad it out.
       #
@@ -309,7 +309,7 @@ class LAC1(object):
       # NO: nop
       # MJ: jump to macro
       # RP: repeat
-      self.sendcmds('MD102,RW538,IB-50,NO,MJ105,RP')
+      self.sendcmds('MD102,RW538,IB-75,NO,MJ105,RP')
 
       # if we are here, then we have found the limit. Now forward 1000 enconder
       # counts and define home there. Finally we turn the motor off because it
@@ -324,17 +324,19 @@ class LAC1(object):
       # GO: start motion
       # WS: wait stop
       # DH: define home
-      # GH: go home
       # MF: motor off
-      self.sendcmds('MD105,ST,WS25,PM,MR1000,GO,WS25,DH0,GH,MF')
-
+      self.sendcmds('MD105,ST,WS25,PM,MR1000,GO,WS25,DH0,MF')
 
       # MD: define macro
       # MC: call macro
       self.sendcmds('MD0,MC100')
 
   def home(self):
+    """
+    Performs the homing process, and leaves the stage at 0.0
+    """
     self.sendcmds('MS100')
+    self.move_absolute_enc(0)
 
   def go(self):
     self.sendcmds('GO')
