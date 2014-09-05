@@ -336,6 +336,9 @@ class LAC1(object):
     Performs the homing process, and leaves the stage at 0.0
     """
     self.sendcmds('MS100')
+
+    # we do this because otherwise the stage, for some reason, sometimes ends
+    # up moving backwards to effectively -1000.
     self.move_absolute_enc(0)
 
   def go(self):
