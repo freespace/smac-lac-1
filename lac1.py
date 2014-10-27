@@ -12,6 +12,9 @@ STAGE_TRAVEL_MM = 25
 STAGE_TRAVEL_UM = STAGE_TRAVEL_MM*1000
 STAGE_TRAVEL_ENC = STAGE_TRAVEL_MM * ENC_COUNTS_PER_MM
 
+# we will not allow travel beyond TRAVEL_SAFETY_FACTOR * STAGE_TRAVEL_ENC
+TRAVEL_SAFETY_FACTOR = 0.95
+
 # KV and KA defined the change in encoder per servo loop needed to achieve
 # 1 mm/s velocity and 1 mm/s/s acceleration, respectively.
 KV = 65536 * ENC_COUNTS_PER_MM / SERVO_LOOP_FREQ
@@ -386,6 +389,8 @@ class LAC1(object):
     """
     Move to a position specified in encoder counts
     """
+    assert pos_enc < STAGE_TRAVEL_ENC * TRAVEL_SAFETY_FACTOR
+    assert pos_enc >= 0
     self.sendcmds('PM', '', 'MN', '', 'MA', pos_enc,'GO','')
     if wait:
       self.wait_stop()
