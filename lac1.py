@@ -66,6 +66,10 @@ class LAC1(object):
 
   _ESC = '\033'
 
+  # number of times to retry a command if the stage
+  # times out
+  timeout_retries = 3
+
   def __init__(self, port, baudRate, silent=True, reset=True):
     """
     If silent is True, then no debugging output will be printed. Default is
@@ -79,7 +83,7 @@ class LAC1(object):
         bytesize = 8,
         stopbits = 1,
         parity = 'N',
-        timeout = 0.01)
+        timeout = 0.1)
 
     self._silent = silent
 
@@ -334,7 +338,7 @@ class LAC1(object):
       # MC: call macro
       self.sendcmds('MD0,MC100')
 
-  def home(self):
+  def home(self, wait=True):
     """
     Performs the homing process, and leaves the stage at 0.0
     """
@@ -342,7 +346,7 @@ class LAC1(object):
 
     # we do this because otherwise the stage, for some reason, sometimes ends
     # up moving backwards to effectively -1000.
-    self.move_absolute_enc(0)
+    self.move_absolute_enc(0, wait)
 
   def go(self):
     self.sendcmds('GO')
@@ -422,7 +426,11 @@ class LAC1(object):
     """
     Returns the current position in encoder counts
     """
-    pos = self.sendcmds('TP')
+    pos = list()
+    retries = 0
+    while len(pos) < 1 and retries < self.timeout_retries:
+      retries += 1
+      pos = self.sendcmds('TP')
     return int(pos[0])
 
   def get_position_mm(self):
