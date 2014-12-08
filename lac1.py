@@ -29,6 +29,10 @@ SE = 16383
 RI = 1
 FR = 1
 
+# LAC-1 doesn't seem to like it when it receives serial commands
+# too quickly. To fix this we wait SERIAL_SEND_WAIT_SEC after
+# each command
+SERIAL_SEND_WAIT_SEC = 0.01
 
 class LAC1(object):
   """
@@ -66,10 +70,6 @@ class LAC1(object):
 
   _ESC = '\033'
 
-  # number of times to retry a command if the stage
-  # times out
-  timeout_retries = 3
-
   def __init__(self, port, baudRate, silent=True, reset=True):
     """
     If silent is True, then no debugging output will be printed. Default is
@@ -83,9 +83,12 @@ class LAC1(object):
         bytesize = 8,
         stopbits = 1,
         parity = 'N',
-        timeout = 0.1)
+        timeout = 0.01)
 
     self._silent = silent
+
+    self._port.write('EF\r\n')
+    self._port.flush()
 
     # setup some initial parameters
     self.sendcmds(
@@ -130,9 +133,12 @@ class LAC1(object):
     done = False
     line = str()
     #print 'reading line',
+    # XXX The loop below implicitly handles timeouts b/c when c == '' due to
+    # timeout, line += '' is a null op, and the loops continues indefinitely
+    # until exitconditions are met
     while not done:
       c = self._port.read()
-      #print repr(c),
+      # print repr(c),
       # ignores \n because we are not a terminal that cares about linefeed
       if c == '\n':
         continue
@@ -220,16 +226,22 @@ class LAC1(object):
 
     # clear any characters in the current input in case a previous sendcmds
     # didn't clean up properly
-    self._port.flushInput()
+    while True:
+      c = self._port.read()
+      if len(c) == 0:
+        break
 
     self._port.write(tosend)
     self._port.write('\r')
 
     self._port.flush()
 
+    time.sleep(SERIAL_SEND_WAIT_SEC)
+
     datalines = []
     wait = kwargs.get('wait', True)
     callbackfunc = kwargs.get('callback', None)
+
 
     if wait:
       done = False
@@ -244,11 +256,14 @@ class LAC1(object):
             callbackfunc(line)
           datalines.append(line)
 
-      # ignore the first line which is repeat of what we sent due to echo
-      # been on by default.
+      # If we have more than one line, then ignore the first which is repeat
+      # of what we sent due to echo been on by default.
       # XXX I don't try to disable echo because I can't seem to turn it off
       # reliably.
-      return datalines[1:]
+      if len(datalines) == 1:
+        return datalines
+      else:
+        return datalines[1:]
     else:
       time.sleep(0.1)
       return None
@@ -426,11 +441,7 @@ class LAC1(object):
     """
     Returns the current position in encoder counts
     """
-    pos = list()
-    retries = 0
-    while len(pos) < 1 and retries < self.timeout_retries:
-      retries += 1
-      pos = self.sendcmds('TP')
+    pos = self.sendcmds('TP')
     return int(pos[0])
 
   def get_position_mm(self):
