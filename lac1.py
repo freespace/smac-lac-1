@@ -355,7 +355,8 @@ class LAC1(object):
 
   def home(self, wait=True):
     """
-    Performs the homing process, and leaves the stage at 0.0
+    Performs the homing process, and leaves the stage at 0.0. Note that this
+    also modifies velocity, acceleration and torque parameters.
     """
     self.sendcmds('MS100')
 
@@ -468,9 +469,6 @@ class LAC1(object):
       self.sendcmds("EN")
       self._port.close()
       self._port = None
-
-  def __del__(self):
-    self.close()
 
 if __name__ == '__main__':
   import sys
