@@ -29,10 +29,11 @@ SE = 16383
 RI = 1
 FR = 1
 
-# LAC-1 doesn't seem to like it when it receives serial commands
-# too quickly. To fix this we wait SERIAL_SEND_WAIT_SEC after
-# each command
-SERIAL_SEND_WAIT_SEC = 0.01
+# LAC-1 manual recommends a small delay of 100 ms after sending commands
+SERIAL_SEND_WAIT_SEC = 0.1
+
+# Each line cannot exceed 127 characters as per LAC-1 manual
+SERIAL_MAX_LINE_LENGTH = 127
 
 class LAC1(object):
   """
@@ -83,12 +84,11 @@ class LAC1(object):
         bytesize = 8,
         stopbits = 1,
         parity = 'N',
-        timeout = 0.01)
+        timeout = 0.1)
 
     self._silent = silent
 
-    self._port.write('EF\r\n')
-    self._port.flush()
+    self.sendcmds('EF', wait=False)
 
     # setup some initial parameters
     self.sendcmds(
@@ -136,14 +136,20 @@ class LAC1(object):
     # XXX The loop below implicitly handles timeouts b/c when c == '' due to
     # timeout, line += '' is a null op, and the loops continues indefinitely
     # until exitconditions are met
+    
+    allowedtimeouts = int(2/self._port.timeout)
     while not done:
       c = self._port.read()
       # print repr(c),
       # ignores \n because we are not a terminal that cares about linefeed
       if c == '\n':
         continue
-      if c == '\r':
+      elif c == '\r':
           done = True
+      elif c == '':
+        allowedtimeouts -= 1
+        if allowedtimeouts == 0:
+          raise Exception('Read Timed Out')
       else:
         line += c
         if stop_on_prompt and c == '>':
@@ -179,15 +185,25 @@ class LAC1(object):
     Exception to this is if argument is a float, in which case it will be cast
     to an int.
 
-    If the keyword argument wait is True, then after sending each command, the
-    serial stream is consumed until '>' is encountered. This is because SMAC
-    emits '>' when it is ready for another command. Any lines seen before
-    encountering '>' and is not empty will be returned. wait is True by
-    default
+    Supported keyword arguments:
 
-    If the keyword argument callback is not None, and wait is True, then
-    after reading each line from the LAC-1, the callback will be invoked
-    with the contents of the line.
+    wait
+    ----
+    If wait is True, then after sending each command, the serial stream
+    is consumed until '>' is encountered. This is because SMAC emits '>' when
+    it is ready for another command. Any lines seen before encountering '>'
+    and is not empty will be returned. wait is True by default
+
+    callback
+    --------
+    If callback is not None, and wait is True, then after reading
+    each line from the LAC-1, the callback will be invoked with the contents
+    of the line.
+    
+    flush
+    -----
+    If flush is True, then flush is called after writing to serial port.
+    Defaults to False.
 
     LAC-1 Commands
     ==============
@@ -231,17 +247,21 @@ class LAC1(object):
       if len(c) == 0:
         break
 
+    assert len(tosend) <= SERIAL_MAX_LINE_LENGTH, 'Command exceeds allowed line length'
+      
     self._port.write(tosend)
     self._port.write('\r')
 
-    self._port.flush()
+    wait = kwargs.get('wait', True)
+    callbackfunc = kwargs.get('callback', None)
+    flush = kwargs.get('flush', False)
+
+    if flush:
+      self._port.flush()
 
     time.sleep(SERIAL_SEND_WAIT_SEC)
 
     datalines = []
-    wait = kwargs.get('wait', True)
-    callbackfunc = kwargs.get('callback', None)
-
 
     if wait:
       done = False
