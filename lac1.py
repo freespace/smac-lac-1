@@ -30,7 +30,7 @@ RI = 1
 FR = 1
 
 # LAC-1 manual recommends a small delay of 100 ms after sending commands
-SERIAL_SEND_WAIT_SEC = 0.1
+SERIAL_SEND_WAIT_SEC = 0.05
 
 # Each line cannot exceed 127 characters as per LAC-1 manual
 SERIAL_MAX_LINE_LENGTH = 127
@@ -421,15 +421,17 @@ class LAC1(object):
     """
     assert pos_enc < STAGE_TRAVEL_ENC * TRAVEL_SAFETY_FACTOR
     assert pos_enc >= 0
-    self.sendcmds('PM', '', 'MN', '', 'MA', pos_enc,'GO','')
+
+    cmds = ['PM', '', 'MN', '', 'MA', pos_enc,'GO','']
     if wait:
-      self.wait_stop()
+      cmds += ['WS', 10]
+    self.sendcmds(*cmds)
 
   def move_absolute_mm(self, pos_mm, **kwargs):
     self.move_absolute_enc(pos_mm * ENC_COUNTS_PER_MM, **kwargs)
 
   def move_absolute_um(self, pos_um, **kwargs):
-    self.move_absolute_enc(1000 * pos_um * ENC_COUNTS_PER_MM, **kwargs)
+    self.move_absolute_enc(pos_um * ENC_COUNTS_PER_MM / 1000, **kwargs)
 
 
   def move_relative_enc(self, dist_enc, wait=True):
