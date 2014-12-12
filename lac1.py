@@ -130,22 +130,21 @@ class LAC1(object):
     argument along to the underlying class, and so you can't actually change
     it.
     """
-    done = False
-    line = str()
     #print 'reading line',
     # XXX The loop below implicitly handles timeouts b/c when c == '' due to
     # timeout, line += '' is a null op, and the loops continues indefinitely
     # until exitconditions are met
-    
+
+    done = False
+    line = str()
     allowedtimeouts = int(2/self._port.timeout)
+
     while not done:
       c = self._port.read()
-      # print repr(c),
-      # ignores \n because we are not a terminal that cares about linefeed
       if c == '\n':
         continue
       elif c == '\r':
-          done = True
+        done = True
       elif c == '':
         allowedtimeouts -= 1
         if allowedtimeouts == 0:
@@ -155,18 +154,12 @@ class LAC1(object):
         if stop_on_prompt and c == '>':
           done = True
 
-    #print ''
     if len(line) and line[0] == '?':
       raise Exception('LAC-1 Error: '+line[1:])
 
-    #print 'read: "%s"'%(line)
+    if not self._silent:
+      print '[>]',line
     return line
-
-  def flush_input_buffer(self):
-    """
-    Flushes the serial input buffer, discarding all results
-    """
-    self._port.flushInput()
 
   def sendcmds(self, *args, **kwargs):
     """
@@ -238,19 +231,16 @@ class LAC1(object):
     tosend = ','.join(cmds)
 
     if not self._silent:
-      print 'sent',tosend
+      print '[<]',tosend
 
     # clear any characters in the current input in case a previous sendcmds
     # didn't clean up properly
-    while True:
-      c = self._port.read()
-      if len(c) == 0:
-        break
+    while self._port.inWaiting() > 0:
+      print '>>',repr(self._port.read())
 
     assert len(tosend) <= SERIAL_MAX_LINE_LENGTH, 'Command exceeds allowed line length'
-      
-    self._port.write(tosend)
-    self._port.write('\r')
+
+    self._port.write(tosend+'\r')
 
     wait = kwargs.get('wait', True)
     callbackfunc = kwargs.get('callback', None)
@@ -390,14 +380,14 @@ class LAC1(object):
   def stop(self):
     self.sendcmds('ST')
 
-  def abort(self):
-    self.sendcmds('AB')
+  def abort(self, **kwargs):
+    self.sendcmds('AB', **kwargs)
 
-  def motor_on(self):
-    self.sendcmds('MN')
+  def motor_on(self, **kwargs):
+    self.sendcmds('MN', **kwargs)
 
-  def motor_off(self):
-    self.sendcmds('MF')
+  def motor_off(self, **kwargs):
+    self.sendcmds('MF', **kwargs)
 
   def go_home(self):
     """
@@ -482,11 +472,10 @@ class LAC1(object):
 
   def close(self):
     if self._port:
-      self.sendcmds(self._ESC, wait=False)
-      self.sendcmds(self._ESC, wait=False)
-      self.abort()
-      self.motor_off()
-      self.sendcmds("EN")
+      self._port.write(self._ESC)
+      self._port.write(self._ESC)
+      # abort, motor off, echo on
+      self._port.write('AB,MF,EN\r')
       self._port.close()
       self._port = None
 
