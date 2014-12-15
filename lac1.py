@@ -137,7 +137,7 @@ class LAC1(object):
 
     done = False
     line = str()
-    allowedtimeouts = int(2/self._port.timeout)
+    allowedtimeouts = int(30/self._port.timeout)
 
     while not done:
       c = self._port.read()
