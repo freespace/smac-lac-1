@@ -13,7 +13,7 @@ STAGE_TRAVEL_UM = STAGE_TRAVEL_MM*1000
 STAGE_TRAVEL_ENC = STAGE_TRAVEL_MM * ENC_COUNTS_PER_MM
 
 # we will not allow travel beyond TRAVEL_SAFETY_FACTOR * STAGE_TRAVEL_ENC
-TRAVEL_SAFETY_FACTOR = 0.95
+TRAVEL_SAFETY_FACTOR = 1.0
 
 # KV and KA defined the change in encoder per servo loop needed to achieve
 # 1 mm/s velocity and 1 mm/s/s acceleration, respectively.
@@ -28,6 +28,9 @@ IL = 5000
 SE = 16383
 RI = 1
 FR = 1
+
+# Time parameter to WS commands. Unit is ms
+WS_PERIOD_MS = 25
 
 # LAC-1 manual recommends a small delay of 100 ms after sending commands
 SERIAL_SEND_WAIT_SEC = 0.05
@@ -410,7 +413,7 @@ class LAC1(object):
     self.sendcmds('SQ',q)
 
   def wait_stop(self):
-    self.sendcmds('WS', 10)
+    self.sendcmds('WS', WS_PERIOD_MS)
 
   def wait(self, interval_ms):
     self.sendcmds('WA', interval_ms)
@@ -424,7 +427,7 @@ class LAC1(object):
 
     cmds = ['PM', '', 'MN', '', 'MA', pos_enc,'GO','']
     if wait:
-      cmds += ['WS', 10]
+      cmds += ['WS', WS_PERIOD_MS]
     self.sendcmds(*cmds)
 
   def move_absolute_mm(self, pos_mm, **kwargs):
