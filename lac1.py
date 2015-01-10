@@ -422,7 +422,7 @@ class LAC1(object):
     """
     Move to a position specified in encoder counts
     """
-    assert pos_enc < STAGE_TRAVEL_ENC * TRAVEL_SAFETY_FACTOR
+    assert pos_enc <= STAGE_TRAVEL_ENC * TRAVEL_SAFETY_FACTOR
     assert pos_enc >= 0
 
     cmds = ['PM', '', 'MN', '', 'MA', pos_enc,'GO','']
