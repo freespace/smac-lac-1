@@ -459,7 +459,11 @@ class LAC1(object):
     Asks LAC-1 for the last error
     """
     error = self.sendcmds('TE', eat_prompt=False)
-    return error[0]
+    if len(error) == 0:
+      print 'error:', error
+      return None
+    else:
+      return error[0]
 
   def get_position_enc(self):
     """
