@@ -33,7 +33,7 @@ FR = 1
 WS_PERIOD_MS = 25
 
 # LAC-1 manual recommends a small delay of 100 ms after sending commands
-SERIAL_SEND_WAIT_SEC = 0.100
+SERIAL_SEND_WAIT_SEC = 0.150
 
 # Each line cannot exceed 127 characters as per LAC-1 manual
 SERIAL_MAX_LINE_LENGTH = 127
@@ -261,8 +261,6 @@ class LAC1(object):
     if flush:
       self._port.flush()
 
-    self._sleepfunc(SERIAL_SEND_WAIT_SEC)
-
     datalines = []
 
     if wait:
@@ -287,6 +285,8 @@ class LAC1(object):
       else:
         return datalines[1:]
     else:
+      # we only need to wait if we are not parsing the reply
+      self._sleepfunc(SERIAL_SEND_WAIT_SEC)
       return None
 
   def set_home_macro(self, force=False):
