@@ -287,7 +287,6 @@ class LAC1(object):
       else:
         return datalines[1:]
     else:
-      time.sleep(0.1)
       return None
 
   def set_home_macro(self, force=False):
