@@ -208,7 +208,7 @@ class LAC1(object):
     flush
     -----
     If flush is True, then flush is called after writing to serial port.
-    Defaults to False.
+    Defaults to True
 
     LAC-1 Commands
     ==============
@@ -256,7 +256,7 @@ class LAC1(object):
 
     wait = kwargs.get('wait', True)
     callbackfunc = kwargs.get('callback', None)
-    flush = kwargs.get('flush', False)
+    flush = kwargs.get('flush', True)
 
     if flush:
       self._port.flush()
