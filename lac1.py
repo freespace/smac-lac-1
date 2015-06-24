@@ -434,7 +434,7 @@ class LAC1(object):
     assert pos_enc <= STAGE_TRAVEL_ENC * TRAVEL_SAFETY_FACTOR
     assert pos_enc >= 0
 
-    cmds = ['PM', '', 'MN', '', 'MA', pos_enc,'GO','']
+    cmds = ['PM', '', 'MN', '', 'MA', int(pos_enc),'GO','']
     if wait:
       cmds += ['WS', WS_PERIOD_MS]
     self.sendcmds(*cmds)
