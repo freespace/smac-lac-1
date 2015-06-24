@@ -426,7 +426,7 @@ class LAC1(object):
   def wait(self, interval_ms):
     self.sendcmds('WA', interval_ms)
 
-  def move_absolute_enc(self, pos_enc, wait=True):
+  def move_absolute_enc(self, pos_enc, wait=True, getposition=False):
     """
     Move to a position specified in encoder counts
     """
@@ -436,7 +436,14 @@ class LAC1(object):
     cmds = ['PM', '', 'MN', '', 'MA', int(pos_enc),'GO','']
     if wait:
       cmds += ['WS', WS_PERIOD_MS]
-    self.sendcmds(*cmds)
+
+      if getposition:
+        cmds += ['TP', '']
+
+    ret = self.sendcmds(*cmds)
+
+    if wait and getposition:
+      return int(ret[0])
 
   def move_absolute_mm(self, pos_mm, **kwargs):
     self.move_absolute_enc(pos_mm * ENC_COUNTS_PER_MM, **kwargs)
