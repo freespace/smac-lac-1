@@ -205,11 +205,6 @@ class LAC1(object):
     each line from the LAC-1, the callback will be invoked with the contents
     of the line.
 
-    flush
-    -----
-    If flush is True, then flush is called after writing to serial port.
-    Defaults to True
-
     LAC-1 Commands
     ==============
     AL = accumulator load
@@ -245,10 +240,8 @@ class LAC1(object):
     if not self._silent:
       print '[<]',tosend
 
-    # clear any characters in the current input in case a previous sendcmds
-    # didn't clean up properly
-    while self._port.inWaiting() > 0:
-      print '>>',repr(self._port.read())
+    self._port.flushInput()
+    self._port.flushOutput()
 
     assert len(tosend) <= SERIAL_MAX_LINE_LENGTH, 'Command exceeds allowed line length'
 
@@ -256,10 +249,7 @@ class LAC1(object):
 
     wait = kwargs.get('wait', True)
     callbackfunc = kwargs.get('callback', None)
-    flush = kwargs.get('flush', True)
 
-    if flush:
-      self._port.flush()
 
     datalines = []
 
