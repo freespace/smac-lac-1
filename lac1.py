@@ -449,8 +449,10 @@ class LAC1(object):
     self.move_absolute_enc(pos_mm * ENC_COUNTS_PER_MM, **kwargs)
 
   def move_absolute_um(self, pos_um, **kwargs):
-    self.move_absolute_enc(pos_um * ENC_COUNTS_PER_MM / 1000, **kwargs)
-
+    kwargs['getposition'] = True
+    ret = self.move_absolute_enc(pos_um * ENC_COUNTS_PER_MM / 1000, **kwargs)
+    if ret is not None:
+      return 1000 * ret / ENC_COUNTS_PER_MM
 
   def move_relative_enc(self, dist_enc, wait=True):
     self.sendcmds('PM', '', 'MN', '', 'MR', dist_enc, 'GO', '')
@@ -466,17 +468,23 @@ class LAC1(object):
     Asks LAC-1 for the last error
     """
     error = self.sendcmds('TE', eat_prompt=False)
-    if len(error) == 0:
-      print 'error:', error
-      return None
-    else:
+    if len(error) > 0:
       return error[0]
+    else:
+      return None
 
   def get_position_enc(self):
     """
     Returns the current position in encoder counts
     """
-    pos = self.sendcmds('TP')
+    pos = list()
+    while len(pos) < 1:
+      try:
+        pos = self.sendcmds('TP')
+      except Exception, ex:
+        from traceback import print_exc
+        print_exc(ex)
+
     return int(pos[0])
 
   def get_position_mm(self):
