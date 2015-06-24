@@ -33,7 +33,7 @@ FR = 1
 WS_PERIOD_MS = 25
 
 # LAC-1 manual recommends a small delay of 100 ms after sending commands
-SERIAL_SEND_WAIT_SEC = 0.05
+SERIAL_SEND_WAIT_SEC = 0.100
 
 # Each line cannot exceed 127 characters as per LAC-1 manual
 SERIAL_MAX_LINE_LENGTH = 127
@@ -204,7 +204,7 @@ class LAC1(object):
     If callback is not None, and wait is True, then after reading
     each line from the LAC-1, the callback will be invoked with the contents
     of the line.
-    
+
     flush
     -----
     If flush is True, then flush is called after writing to serial port.
