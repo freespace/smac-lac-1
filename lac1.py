@@ -74,11 +74,20 @@ class LAC1(object):
 
   _ESC = '\033'
 
-  def __init__(self, port, baudRate, silent=True, reset=True):
+  _sleepfunc = time.sleep
+
+  def __init__(self, port, baudRate, silent=True, reset=True, sleepfunc=None):
     """
     If silent is True, then no debugging output will be printed. Default is
     True.
+
+    If sleepfunc is not None, then it will be used instead of time.sleep.
+    It will be passed the number of seconds to sleep for. This is provided
+    for integration with single threaded GUI applications.
     """
+
+    if sleepfunc is not None:
+      self._sleepfunc = sleepfunc
 
     print 'Connecting to LAC-1 on %s (%s)'%(port, baudRate)
     self._port = serial.Serial(
@@ -252,7 +261,7 @@ class LAC1(object):
     if flush:
       self._port.flush()
 
-    time.sleep(SERIAL_SEND_WAIT_SEC)
+    self._sleepfunc(SERIAL_SEND_WAIT_SEC)
 
     datalines = []
 
