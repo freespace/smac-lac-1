@@ -33,7 +33,7 @@ FR = 1
 WS_PERIOD_MS = 25
 
 # LAC-1 manual recommends a small delay of 100 ms after sending commands
-SERIAL_SEND_WAIT_SEC = 0.150
+SERIAL_SEND_WAIT_SEC = 0.100
 
 # Each line cannot exceed 127 characters as per LAC-1 manual
 SERIAL_MAX_LINE_LENGTH = 127
@@ -75,6 +75,8 @@ class LAC1(object):
   _ESC = '\033'
 
   _sleepfunc = time.sleep
+
+  _last_serial_send_time = None
 
   def __init__(self, port, baudRate, silent=True, reset=True, sleepfunc=None):
     """
@@ -215,6 +217,14 @@ class LAC1(object):
     MC = macro call
     MA = move absolute
     """
+    # XXX enforce SERIAL_SEND_WAIT_SEC
+    now = time.time()
+    if self._last_serial_send_time is not None:
+      dt = now - self._last_serial_send_time
+      timeleft = SERIAL_SEND_WAIT_SEC - dt
+      if timeleft > 0:
+        self._sleepfunc(timeleft)
+
     if len(args) == 1:
       cmds = [args[0]]
     else:
@@ -275,8 +285,9 @@ class LAC1(object):
       else:
         return datalines[1:]
     else:
-      # we only need to wait if we are not parsing the reply
-      self._sleepfunc(SERIAL_SEND_WAIT_SEC)
+      # we update _last_serial_send_time only if we are not
+      # waiting for a response
+      self._last_serial_send_time = now 
       return None
 
   def set_home_macro(self, force=False):
