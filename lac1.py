@@ -218,6 +218,9 @@ class LAC1(object):
     MA = move absolute
     """
     # XXX enforce SERIAL_SEND_WAIT_SEC
+    if self._port is None:
+      return
+
     now = time.time()
     if self._last_serial_send_time is not None:
       dt = now - self._last_serial_send_time
@@ -265,7 +268,7 @@ class LAC1(object):
 
     if wait:
       done = False
-      while not done:
+      while not done and self._port is not None:
         #print 'sendcmds, reading'
         line = self._readline()
         #print 'sendcmds:',line
