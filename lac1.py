@@ -542,6 +542,64 @@ class LAC1(object):
     paramset is 0...n
     """
     return self.sendcmds('TK', paramset)
+  
+  def softland(self):
+    """
+    This function executes a softland move
+    """
+    # go into velocity mode, turn motor on, set force, acceleration and
+    # velocity constants, set direction to be in the direction of INCREASING
+    # encoder count, start motion, wait 20ms.
+    #
+    # MD: define macro
+    # VM: velocity mode
+    # MN: motor on
+    # SQ: torque
+    # SA: acceleration
+    # SV: velocity
+    # DI: direction
+    # GO: begin movement
+    # WA: wait
+    self.sendcmds('MD100,VM,MN,SQ5000,SA1000,SV50000,DI0,GO,WA20')
+
+    # read word from memory 538, which is position error. If position error
+    # is greater than 20, display a message, jump to macro 105. If position error
+    # is greater than 5000, display a message, jump to macro 110. Otherwise repeat.
+    #
+    # MD: define macro
+    # RW: read word from memory 538, where position error is stored
+    # IB: if below
+    # MG: print message
+    # MJ: jump to macro
+    # RP: repeat
+    self.sendcmds('MD101,RW538,IG20,MG"FOUND",MJ105,RL494,IG5000,MG"TOO FAR",MJ110,RP')
+
+    # Stop motion, display message (:N means no carriage return after message), 
+    # Tell Position then jump to MD110.
+    #
+    # MD: define macro
+    # ST: stop
+    # MG: print message
+    # TP: tell position
+    # MJ: jump to macro
+    self.sendcmds('MD105,ST,MG"POSITION = ":N,TP,MJ110')
+
+    # Enter position mode, set acceleration and force higher. Issue go home (GH) command but 
+    # wait 50ms before ramping force up to maximum. This is needed because if the force is 
+    #increased immediately then any position error will be taken up, possibly deforming the 
+    # measured component. Wait after stop 100ms then jump back to MD100.
+    # MD: define macro
+    # PM: position mode
+    # SA: acceleration
+    # SV: velocity
+    # GH: go home
+    # WA: wait
+    # SQ: torque
+    # WS: wait stop
+    # MJ: jump to macro
+    self.sendcmds('MD110,PM,MN,SA5000,SV500000,GH,WA50,SQ32767,WS100,MJ100')
+
+    self.sendcmds('MS100')
 
   def close(self):
     if self._port:
