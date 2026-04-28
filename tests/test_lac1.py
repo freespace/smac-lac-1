@@ -306,6 +306,62 @@ def test_get_params(fake_serial):
     assert fake.written[-1] == b'TK10\r'
     assert param[0] == 'Version XXX'
 
+def test_softland_no_macro(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'')
+
+    controller.softland(limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+
+    fake = fake_serial['instance']
+    assert fake.written[-5] == b'TM500\r'
+    assert fake.written[-4] == b'MD500,VM,MN,SQ3276,SA13107,SV26214,DI0,GO,WA200\r'
+    assert fake.written[-3] == b'MD501,RW538,IG20,MG"FOUND",MJ505,RL494,IG5000,MG"TOO FAR",MJ505,RP\r'
+    assert fake.written[-2] == b'MD505,ST\r'
+    assert fake.written[-1] == b'MS500\r'
+
+def test_softland_existing_macro(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'MD500,VM,MN,SQ3276,SA13107,SV26214,DI0,GO,WA200')
+
+    controller.softland(limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+
+    fake = fake_serial['instance']
+    assert fake.written[-2] == b'TM500\r'
+    assert fake.written[-1] == b'MS500\r'
+
+def test_softland_force(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'MD0,MC100')
+
+    controller.softland(force=True, limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+
+    fake = fake_serial['instance']
+    assert fake.written[-5] == b'TM500\r'
+    assert fake.written[-4] == b'MD500,VM,MN,SQ3276,SA13107,SV26214,DI0,GO,WA200\r'
+    assert fake.written[-3] == b'MD501,RW538,IG20,MG"FOUND",MJ505,RL494,IG5000,MG"TOO FAR",MJ505,RP\r'
+    assert fake.written[-2] == b'MD505,ST\r'
+    assert fake.written[-1] == b'MS500\r'
+
+def test_softland_no_execute(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'')
+
+    controller.softland(execute=False, limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+
+    fake = fake_serial['instance']
+    assert fake.written[-4] == b'TM500\r'
+    assert fake.written[-3] == b'MD500,VM,MN,SQ3276,SA13107,SV26214,DI0,GO,WA200\r'
+    assert fake.written[-2] == b'MD501,RW538,IG20,MG"FOUND",MJ505,RL494,IG5000,MG"TOO FAR",MJ505,RP\r'
+    assert fake.written[-1] == b'MD505,ST\r'
+
 def test_close(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
     controller.close()
