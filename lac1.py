@@ -51,10 +51,6 @@ class Actuator(object):
   def __post_init__(self):
     object.__setattr__(self, 'stage_travel_enc', self.stage_travel_mm * self.enc_counts_per_mm)
 
-  # Allow upacking
-  def __iter__(self):
-      return iter(astuple(self))
-
 class LAC1(object):
   """
   Class to interface with a SMAC LAC-1 module.
@@ -337,7 +333,12 @@ class LAC1(object):
     force is True.
     """
 
-    enc_counts_per_mm, _, SG, SI, SD, IL, _, RI, FR, _ = self.actuator
+    SG = self.actuator.SG
+    SI = self.actuator.SI
+    SD = self.actuator.SD
+    IL = self.actuator.IL
+    RI = self.actuator.RI
+    FR = self.actuator.FR
 
     macro0 = self.sendcmds('TM0')
     if len(macro0) == 0 or force:
