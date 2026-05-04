@@ -502,13 +502,14 @@ class LAC1(object):
 
   def move_absolute_mm(self, pos_mm, **kwargs):
     pos_mm = ensure_units(pos_mm, 'mm')
-
-    self.move_absolute_enc(pos_mm * self.actuator.enc_counts_per_mm, **kwargs)
-
+ 
+    ret = self.move_absolute_enc(pos_mm * self.actuator.enc_counts_per_mm, **kwargs)
+    if ret is not None:
+      return (ensure_units(ret, 'counts') / self.actuator.enc_counts_per_mm).to('mm').magnitude
+    
   def move_absolute_um(self, pos_um, **kwargs):
     pos_um = ensure_units(pos_um, 'um')
 
-    kwargs['getposition'] = True
     ret = self.move_absolute_enc(pos_um * self.actuator.enc_counts_per_mm, **kwargs)
     if ret is not None:
       return (ensure_units(ret, 'counts') / self.actuator.enc_counts_per_mm).to('um').magnitude

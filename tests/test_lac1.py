@@ -236,7 +236,24 @@ def test_move_absolute_mm(fake_serial):
     fake = fake_serial['instance']
     assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25\r'
 
+def test_move_absolute_mm_position(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'1000\r')
+
+    pos = controller.move_absolute_mm(1, getposition=True)
+    assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25,TP\r'
+    assert pos == 1
+
 def test_move_absolute_um(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.move_absolute_um(1000)
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25\r'
+
+def test_move_absolute_um_position(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
 
     fake = fake_serial['instance']
