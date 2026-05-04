@@ -514,6 +514,13 @@ class LAC1(object):
     if ret is not None:
       return (ensure_units(ret, 'counts') / self.actuator.enc_counts_per_mm).to('um').magnitude
 
+  def move_absolute(self, pos, **kwargs):
+    pos = ensure_units(pos, 'mm')
+    
+    ret = self.move_absolute_enc(pos * self.actuator.enc_counts_per_mm, **kwargs)
+    if ret is not None:
+      return (ensure_units(ret, 'counts') / self.actuator.enc_counts_per_mm)
+
   def move_relative_enc(self, dist_enc, wait=True):
     dist_enc = ensure_units(dist_enc, 'counts')
 
@@ -526,6 +533,11 @@ class LAC1(object):
     dist_mm = ensure_units(dist_mm, 'mm')
 
     self.move_relative_enc(dist_mm * self.actuator.enc_counts_per_mm, **kwargs)
+
+  def move_relative(self, dist, **kwargs):
+    dist = ensure_units(dist, 'mm')
+
+    self.move_relative_enc(dist * self.actuator.enc_counts_per_mm, **kwargs)
 
   def get_error(self):
     """
@@ -561,6 +573,10 @@ class LAC1(object):
   def get_position_um(self):
     ret = self.get_position_enc()
     return (ensure_units(ret, 'counts') / self.actuator.enc_counts_per_mm).to('um').magnitude
+
+  def get_position(self):
+    ret = self.get_position_enc()
+    return (ensure_units(ret, 'counts') / self.actuator.enc_counts_per_mm)
 
   def get_params(self, paramset=''):
     """

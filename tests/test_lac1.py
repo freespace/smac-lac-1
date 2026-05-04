@@ -1,5 +1,6 @@
 import pytest
 from fakes import FakeSerial
+from units import ureg
 
 @pytest.fixture
 def fake_serial(monkeypatch):
@@ -167,9 +168,23 @@ def test_set_max_velocity_1(fake_serial):
     fake = fake_serial['instance']
     assert fake.written[-1] == b'SV13107\r'
 
+def test_set_max_velocity_100_units(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.set_max_velocity(0.100 * ureg.m / ureg.s)
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'SV1310720\r'
+
 def test_max_acceleration_1000(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
     controller.set_max_acceleration(1000)
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'SA2621\r'
+
+def test_max_acceleration_1000_units(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.set_max_acceleration(1 * ureg.m / (ureg.s**2))
 
     fake = fake_serial['instance']
     assert fake.written[-1] == b'SA2621\r'
@@ -263,6 +278,23 @@ def test_move_absolute_um_position(fake_serial):
     assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25,TP\r'
     assert pos == 1000
 
+def test_move_absolute(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.move_absolute(1 * ureg.mm)
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25\r'
+
+def test_move_absolute_position(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'1000\r')
+
+    pos = controller.move_absolute(1 * ureg.mm, getposition=True)
+    assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25,TP\r'
+    assert pos.to(ureg.mm).magnitude == 1  
+
 def test_move_relative_enc(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
     controller.move_relative_enc(5000)
@@ -274,6 +306,14 @@ def test_move_relative_enc(fake_serial):
 def test_move_relative_mm(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
     controller.move_relative_mm(5)
+
+    fake = fake_serial['instance']
+    assert fake.written[-2] == b'PM,MN,MR5000,GO\r'
+    assert fake.written[-1] == b'WS25\r'
+
+def test_move_relative(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.move_relative(5 * ureg.mm)
 
     fake = fake_serial['instance']
     assert fake.written[-2] == b'PM,MN,MR5000,GO\r'
@@ -312,6 +352,15 @@ def test_get_position_um(fake_serial):
     fake.queue_response(b'1000\r')
     pos = controller.get_position_um()
     assert pos == 1000
+
+def test_get_position(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'1000\r')
+    pos = controller.get_position()
+    print(pos)
+    assert pos.to(ureg.mm).magnitude == 1
 
 def test_get_params(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
