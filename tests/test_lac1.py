@@ -312,7 +312,7 @@ def test_softland_no_macro(fake_serial):
     fake = fake_serial['instance']
     fake.queue_response(b'')
 
-    controller.softland(limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+    controller.softland(limit=5, duty=0.1, velocity=2, acceleration=5000)
 
     fake = fake_serial['instance']
     assert fake.written[-5] == b'TM500\r'
@@ -327,7 +327,7 @@ def test_softland_existing_macro(fake_serial):
     fake = fake_serial['instance']
     fake.queue_response(b'MD500,VM,MN,SQ3276,SA13107,SV26214,DI0,GO,WA200')
 
-    controller.softland(limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+    controller.softland(limit=5, duty=0.1, velocity=2, acceleration=5000)
 
     fake = fake_serial['instance']
     assert fake.written[-2] == b'TM500\r'
@@ -339,7 +339,7 @@ def test_softland_force(fake_serial):
     fake = fake_serial['instance']
     fake.queue_response(b'MD0,MC100')
 
-    controller.softland(force=True, limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+    controller.softland(force=True, limit=5, duty=0.1, velocity=2, acceleration=5000)
 
     fake = fake_serial['instance']
     assert fake.written[-5] == b'TM500\r'
@@ -354,7 +354,7 @@ def test_softland_no_execute(fake_serial):
     fake = fake_serial['instance']
     fake.queue_response(b'')
 
-    controller.softland(execute=False, limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+    controller.softland(execute=False, limit=5, duty=0.1, velocity=2, acceleration=5000)
 
     fake = fake_serial['instance']
     assert fake.written[-4] == b'TM500\r'

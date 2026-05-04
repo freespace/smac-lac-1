@@ -2,14 +2,15 @@
 import serial
 import time
 from dataclasses import dataclass, field, astuple
+from units import set_units, ensure_units
 
 # it is important to make these floats to avoid integer truncation error
-ENC_COUNTS_PER_MM = 1000.0  # default encoder counts per mm
-SERVO_LOOP_FREQ = 5000.0    # servo loop frequency
+ENC_COUNTS_PER_MM = '1000.0 counts/mm'  # default encoder counts per mm
+SERVO_LOOP_FREQ = '5000.0 1/s'    # servo loop frequency
 
 # This is specific to the stage I am using
 # TODO Implement range checking for safety?
-STAGE_TRAVEL_MM = 25
+STAGE_TRAVEL_MM = '25 mm'
 
 # we will not allow travel beyond TRAVEL_SAFETY_FACTOR * STAGE_TRAVEL_ENC
 TRAVEL_SAFETY_FACTOR = 1.0
@@ -49,7 +50,8 @@ class Actuator(object):
   stage_travel_enc: float = field(init=False)
 
   def __post_init__(self):
-    object.__setattr__(self, 'stage_travel_enc', self.stage_travel_mm * self.enc_counts_per_mm)
+    self.stage_travel_mm = ensure_units(self.stage_travel_mm, 'mm')
+    self.enc_counts_per_mm = ensure_units(self.enc_counts_per_mm, 'counts / mm')
 
 class LAC1(object):
   """
@@ -101,6 +103,8 @@ class LAC1(object):
     for integration with single threaded GUI applications.
     """
 
+    self.servo_loop_frequency = ensure_units(SERVO_LOOP_FREQ, '1/s')
+
     if sleepfunc is not None:
       self._sleepfunc = sleepfunc
 
@@ -111,8 +115,8 @@ class LAC1(object):
 
     # KV and KA defined the change in encoder per servo loop needed to achieve
     # 1 mm/s velocity and 1 mm/s/s acceleration, respectively.
-    self.KV = 65536 * self.actuator.enc_counts_per_mm / SERVO_LOOP_FREQ
-    self.KA = 65536 * self.actuator.enc_counts_per_mm / (SERVO_LOOP_FREQ**2)
+    self.KV = ensure_units(65536 * self.actuator.enc_counts_per_mm / self.servo_loop_frequency, 'counts/(mm/s)')
+    self.KA = ensure_units(65536 * self.actuator.enc_counts_per_mm / (self.servo_loop_frequency**2), 'counts/(mm/s**2)')
 
     print('Connecting to controller on %s (%s)'%(port, baudRate))
     self._port = serial.Serial(
@@ -138,8 +142,8 @@ class LAC1(object):
         'FR', self.actuator.FR)
 
     # these are pretty safe values
-    self.set_max_velocity(1)
-    self.set_max_acceleration(1)
+    self.set_max_velocity('1 mm/s')
+    self.set_max_acceleration('1 mm/s**2')
 
   def _readline(self, stop_on_prompt=True):
     """
@@ -316,7 +320,7 @@ class LAC1(object):
       self._last_serial_send_time = now 
       return None
 
-  def set_home_macro(self, force=False, duty=0.9, mmpersecond=4, mmpersecondsquared=10000):
+  def set_home_macro(self, force=False, duty=0.9, velocity='4 mm/s', acceleration='10000 mm/s**2'):
     """
     This function defines a homing macros on macros 100,101,102, and 105. It
     will also inserts a call to macro 100 in macro 0. This means this routine
@@ -332,6 +336,9 @@ class LAC1(object):
     This function does nothing if TM0 returns a non-zero length string, unless
     force is True.
     """
+
+    velocity = ensure_units(velocity, 'mm / s' )
+    acceleration = ensure_units(acceleration, 'mm / s**2')
 
     SG = self.actuator.SG
     SI = self.actuator.SI
@@ -375,9 +382,9 @@ class LAC1(object):
       # WA: wait
       SQ = int(duty * 32767)
       print('SQ:', SQ)
-      SA = int(self.KA * mmpersecondsquared)
+      SA = int((self.KA * acceleration).to('counts').magnitude)
       print('SA:', SA)
-      SV = int(self.KV * mmpersecond)
+      SV = int((self.KV * velocity).to('counts').magnitude)
       print('SV:', SV)
       self.sendcmds(f'MD101,VM,MN,SQ{SQ},SA{SA},SV{SV},DI1,GO,WA20')
 
@@ -424,7 +431,7 @@ class LAC1(object):
 
     # we do this because otherwise the stage, for some reason, sometimes ends
     # up moving backwards to effectively -1000.
-    self.move_absolute_enc(0, wait)
+    self.move_absolute('0 mm', wait=wait)
 
   def go(self):
     self.sendcmds('GO')
@@ -448,11 +455,15 @@ class LAC1(object):
     """
     self.sendcmds('MN','','GH', '')
 
-  def set_max_velocity(self, mmpersecond):
-    self.sendcmds('SV', self.KV * mmpersecond)
+  def set_max_velocity(self, velocity):
+    velocity = ensure_units(velocity, 'mm / s' )
+    SV = int((self.KV * velocity).to('counts').magnitude)
+    self.sendcmds('SV', SV)
 
-  def set_max_acceleration(self, mmpersecondpersecond):
-    self.sendcmds('SA', self.KA * mmpersecondpersecond)
+  def set_max_acceleration(self, acceleration):
+    acceleration = ensure_units(acceleration, 'mm / s**2')
+    SA = int((self.KA * acceleration).to('counts').magnitude)
+    self.sendcmds('SA', SA)
 
   def set_max_torque(self, q):
     """
@@ -465,16 +476,19 @@ class LAC1(object):
     self.sendcmds('WS', WS_PERIOD_MS)
 
   def wait(self, interval_ms):
-    self.sendcmds('WA', interval_ms)
+    interval_ms = ensure_units(interval_ms, 'ms')
+    self.sendcmds('WA', interval_ms.magnitude)
 
   def move_absolute_enc(self, pos_enc, wait=True, getposition=False):
     """
     Move to a position specified in encoder counts
     """
-    assert pos_enc <= self.actuator.stage_travel_enc * TRAVEL_SAFETY_FACTOR
+    pos_enc = ensure_units(pos_enc, 'counts')
+
+    assert pos_enc <= self.actuator.stage_travel_mm * self.actuator.enc_counts_per_mm * TRAVEL_SAFETY_FACTOR
     assert pos_enc >= 0
 
-    cmds = ['PM', '', 'MN', '', 'MA', int(pos_enc),'GO','']
+    cmds = ['PM', '', 'MN', '', 'MA', int(pos_enc.magnitude),'GO','']
     if wait:
       cmds += ['WS', WS_PERIOD_MS]
 
@@ -484,24 +498,32 @@ class LAC1(object):
     ret = self.sendcmds(*cmds)
 
     if wait and getposition:
-      return int(ret[0])
+      return set_units(int(ret[0]), 'counts')
 
   def move_absolute_mm(self, pos_mm, **kwargs):
+    pos_mm = ensure_units(pos_mm, 'mm')
+
     self.move_absolute_enc(pos_mm * self.actuator.enc_counts_per_mm, **kwargs)
 
   def move_absolute_um(self, pos_um, **kwargs):
+    pos_um = ensure_units(pos_um, 'um')
+
     kwargs['getposition'] = True
-    ret = self.move_absolute_enc(pos_um * self.actuator.enc_counts_per_mm / 1000, **kwargs)
+    ret = self.move_absolute_enc(pos_um * self.actuator.enc_counts_per_mm, **kwargs)
     if ret is not None:
-      return 1000 * ret / self.actuator.enc_counts_per_mm
+      return (ensure_units(ret, 'counts') / self.actuator.enc_counts_per_mm).to('um').magnitude
 
   def move_relative_enc(self, dist_enc, wait=True):
-    self.sendcmds('PM', '', 'MN', '', 'MR', dist_enc, 'GO', '')
+    dist_enc = ensure_units(dist_enc, 'counts')
+
+    self.sendcmds('PM', '', 'MN', '', 'MR', int(dist_enc.magnitude), 'GO', '')
 
     if wait:
       self.wait_stop()
 
   def move_relative_mm(self, dist_mm, **kwargs):
+    dist_mm = ensure_units(dist_mm, 'mm')
+
     self.move_relative_enc(dist_mm * self.actuator.enc_counts_per_mm, **kwargs)
 
   def get_error(self):
@@ -526,16 +548,18 @@ class LAC1(object):
         from traceback import print_exc
         print_exc()
 
-    return int(pos[0])
+    return set_units(int(pos[0]), 'counts')
 
   def get_position_mm(self):
     """
     Returns the current position in mm
     """
-    return self.get_position_enc() / self.actuator.enc_counts_per_mm
+    ret = self.get_position_enc()
+    return (ensure_units(ret, 'counts') / self.actuator.enc_counts_per_mm).to('mm').magnitude
 
   def get_position_um(self):
-    return 1000 * self.get_position_enc() / self.actuator.enc_counts_per_mm
+    ret = self.get_position_enc()
+    return (ensure_units(ret, 'counts') / self.actuator.enc_counts_per_mm).to('um').magnitude
 
   def get_params(self, paramset=''):
     """
@@ -543,7 +567,7 @@ class LAC1(object):
     """
     return self.sendcmds('TK', paramset)
   
-  def softland(self, force=False, execute=True, limit=10, duty=0.9, mmpersecond=4, mmpersecondsquared=10000):
+  def softland(self, force=False, execute=True, limit='10 mm', duty=0.9, velocity='4 mm/s', acceleration='10000 mm/s**2'):
     """
     This function executes a softland move. Details are derived from SMAC-MCA 
     Actuators User Manual rev 1.8 pg 38 
@@ -554,7 +578,9 @@ class LAC1(object):
     velocity mode, monitoring the position error as the rod is moving with a 
     controlled force
     """
-    enc_counts_per_mm = self.actuator.enc_counts_per_mm
+    limit = ensure_units(limit, 'mm')
+    velocity = ensure_units(velocity, 'mm / s' )
+    acceleration = ensure_units(acceleration, 'mm / s**2')
 
     macro500 = self.sendcmds('TM500')
     if len(macro500) == 0 or force:
@@ -574,9 +600,9 @@ class LAC1(object):
       # WA: wait
       SQ = int(duty * 32767)
       print('SQ:', SQ)
-      SA = int(self.KA * mmpersecondsquared)
+      SA = int((self.KA * acceleration).to('counts').magnitude)
       print('SA:', SA)
-      SV = int(self.KV * mmpersecond)
+      SV = int((self.KV * velocity).to('counts').magnitude)
       print('SV:', SV)
       self.sendcmds(f'MD500,VM,MN,SQ{SQ},SA{SA},SV{SV},DI0,GO,WA200')
 
@@ -591,7 +617,7 @@ class LAC1(object):
       # MJ: jump to macro
       # RL: read long from memory, which is the position in encoder counts. We use this
       # RP: repeat
-      max_travel = int(limit * enc_counts_per_mm)
+      max_travel = int((limit * self.actuator.enc_counts_per_mm).to('counts').magnitude)
       print('max_travel:', max_travel)
       self.sendcmds(f'MD501,RW538,IG20,MG"FOUND",MJ505,RL494,IG{max_travel},MG"TOO FAR",MJ505,RP')
 
