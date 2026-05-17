@@ -542,6 +542,69 @@ class LAC1(object):
     paramset is 0...n
     """
     return self.sendcmds('TK', paramset)
+  
+  def softland(self, force=False, execute=True, limit=10, duty=0.9, mmpersecond=4, mmpersecondsquared=10000):
+    """
+    This function executes a softland move. Details are derived from SMAC-MCA 
+    Actuators User Manual rev 1.8 pg 38 
+    (https://www.smac-mca.com/documents/PDFs/SMAC%20Actuators%20User%20Manual.pdf)
+
+    Softland is the routine which enables the actuator to land on a surface 
+    with a low force, for example to measure a component. This is done in 
+    velocity mode, monitoring the position error as the rod is moving with a 
+    controlled force
+    """
+    enc_counts_per_mm = self.actuator.enc_counts_per_mm
+
+    macro500 = self.sendcmds('TM500')
+    if len(macro500) == 0 or force:
+
+      # go into velocity mode, turn motor on, set force, acceleration and
+      # velocity constants, set direction to be in the direction of INCREASING
+      # encoder count, start motion, wait 20ms.
+      #
+      # MD: define macro
+      # VM: velocity mode
+      # MN: motor on
+      # SQ: torque
+      # SA: acceleration
+      # SV: velocity
+      # DI: direction
+      # GO: begin movement
+      # WA: wait
+      SQ = int(duty * 32767)
+      print('SQ:', SQ)
+      SA = int(self.KA * mmpersecondsquared)
+      print('SA:', SA)
+      SV = int(self.KV * mmpersecond)
+      print('SV:', SV)
+      self.sendcmds(f'MD500,VM,MN,SQ{SQ},SA{SA},SV{SV},DI0,GO,WA200')
+
+      # read word from memory 538, which is position error. If position error
+      # is greater than 20, display a message, jump to macro 505. If position error
+      # is greater than 5000, display a message, jump to macro 510. Otherwise repeat.
+      #
+      # MD: define macro
+      # RW: read word from memory 538, where position error is stored
+      # IG: if greater
+      # MG: print message
+      # MJ: jump to macro
+      # RL: read long from memory, which is the position in encoder counts. We use this
+      # RP: repeat
+      max_travel = int(limit * enc_counts_per_mm)
+      print('max_travel:', max_travel)
+      self.sendcmds(f'MD501,RW538,IG20,MG"FOUND",MJ505,RL494,IG{max_travel},MG"TOO FAR",MJ505,RP')
+
+      # Stop motion
+      #
+      # MD: define macro
+      # ST: stop
+      self.sendcmds('MD505,ST')
+
+    if(execute):
+      print('Executing softland macro')
+      msg = self.sendcmds('MS500')
+      print(msg)
 
   def close(self):
     if self._port:
