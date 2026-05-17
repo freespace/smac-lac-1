@@ -25,8 +25,7 @@ def ensure_units(value: Union[int, float, str, Q_], defaultUnits: str) -> Q_:
   if not isinstance(value, Q_):
     match value:
         case int() | float():
-            warn(f'No units assigned, assumed value of {value}, has units of {defaultUnits}')
-            response = Q_(value, defaultUnits)
+            response = Q_(value, 'dimensionless')
         case str():
             response = Q_(value)
         case _:
