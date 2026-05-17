@@ -24,8 +24,8 @@ def fake_serial(monkeypatch):
 def actuator():
     from lac1 import Actuator
     actuator = Actuator(
-        enc_counts_per_mm=1000.0,
-        stage_travel_mm=100.0,
+        enc_counts_per_mm='1000.0 counts/mm',
+        stage_travel_mm='100.0 mm',
         SG=10,
         SI=4,
         SD=100,
@@ -38,8 +38,8 @@ def actuator():
 def high_res_actuator():
     from lac1 import Actuator
     actuator = Actuator(
-        enc_counts_per_mm=5000.0,
-        stage_travel_mm=100.0,
+        enc_counts_per_mm='5000.0 counts/mm',
+        stage_travel_mm='100.0 mm',
         SG=10,
         SI=4,
         SD=100,
@@ -80,7 +80,7 @@ def test_sendcmd_set_home_macro_no_macro(fake_serial, actuator):
 
 def test_move_absolute_mm(fake_serial, high_res_actuator):
     controller = LAC1(port='COM_TEST', baudRate=9600, actuator=high_res_actuator)
-    controller.move_absolute_mm(1)
+    controller.move_absolute_mm('1 mm')
 
     fake = fake_serial['instance']
     assert fake.written[-1] == b'PM,MN,MA5000,GO,WS25\r'

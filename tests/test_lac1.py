@@ -1,5 +1,6 @@
 import pytest
 from fakes import FakeSerial
+from units import ureg
 
 @pytest.fixture
 def fake_serial(monkeypatch):
@@ -155,28 +156,42 @@ def test_go_home(fake_serial):
 
 def test_set_max_velocity_100(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
-    controller.set_max_velocity(100)
+    controller.set_max_velocity('100 mm/s')
 
     fake = fake_serial['instance']
     assert fake.written[-1] == b'SV1310720\r'
 
 def test_set_max_velocity_1(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
-    controller.set_max_velocity(1)
+    controller.set_max_velocity('1 mm/s')
 
     fake = fake_serial['instance']
     assert fake.written[-1] == b'SV13107\r'
 
+def test_set_max_velocity_100_units(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.set_max_velocity(0.100 * ureg.m / ureg.s)
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'SV1310720\r'
+
 def test_max_acceleration_1000(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
-    controller.set_max_acceleration(1000)
+    controller.set_max_acceleration('1000 mm/s**2')
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'SA2621\r'
+
+def test_max_acceleration_1000_units(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.set_max_acceleration(1 * ureg.m / (ureg.s**2))
 
     fake = fake_serial['instance']
     assert fake.written[-1] == b'SA2621\r'
 
 def test_max_acceleration_1(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
-    controller.set_max_acceleration(1)
+    controller.set_max_acceleration('1 mm/s**2')
 
     fake = fake_serial['instance']
     assert fake.written[-1] == b'SA2\r'
@@ -197,7 +212,7 @@ def test_wait_stop(fake_serial):
 
 def test_move_absolute_enc(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
-    controller.move_absolute_enc(1000)
+    controller.move_absolute_enc('1000 counts')
 
     fake = fake_serial['instance']
     assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25\r'
@@ -205,16 +220,16 @@ def test_move_absolute_enc(fake_serial):
 def test_move_absolute_enc_negative(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
     with pytest.raises(AssertionError):
-        controller.move_absolute_enc(-1000)
+        controller.move_absolute_enc('-1000 counts')
 
 def test_move_absolute_enc_too_far(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
     with pytest.raises(AssertionError):
-        controller.move_absolute_enc(100000000)
+        controller.move_absolute_enc('100000000 counts')
 
 def test_move_absolute_enc_no_wait(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
-    controller.move_absolute_enc(1000, wait=False)
+    controller.move_absolute_enc('1000 counts', wait=False)
 
     fake = fake_serial['instance']
     assert fake.written[-1] == b'PM,MN,MA1000,GO\r'
@@ -225,30 +240,64 @@ def test_move_absolute_enc_position(fake_serial):
     fake = fake_serial['instance']
     fake.queue_response(b'1000\r')
 
-    pos = controller.move_absolute_enc(1000, getposition=True)
+    pos = controller.move_absolute_enc('1000 counts', getposition=True)
     assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25,TP\r'
     assert pos == 1000
 
 def test_move_absolute_mm(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
-    controller.move_absolute_mm(1)
+    controller.move_absolute_mm('1 mm')
 
     fake = fake_serial['instance']
     assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25\r'
 
-def test_move_absolute_um(fake_serial):
+def test_move_absolute_mm_position(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
 
     fake = fake_serial['instance']
     fake.queue_response(b'1000\r')
 
-    pos = controller.move_absolute_um(1000, getposition=True)
+    pos = controller.move_absolute_mm('1 mm', getposition=True)
+    assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25,TP\r'
+    assert pos == 1
+
+def test_move_absolute_um(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.move_absolute_um('1000 um')
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25\r'
+
+def test_move_absolute_um_position(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'1000\r')
+
+    pos = controller.move_absolute_um('1000 um', getposition=True)
     assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25,TP\r'
     assert pos == 1000
 
+def test_move_absolute(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.move_absolute(1 * ureg.mm)
+
+    fake = fake_serial['instance']
+    assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25\r'
+
+def test_move_absolute_position(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'1000\r')
+
+    pos = controller.move_absolute(1 * ureg.mm, getposition=True)
+    assert fake.written[-1] == b'PM,MN,MA1000,GO,WS25,TP\r'
+    assert pos.to(ureg.mm).magnitude == 1  
+
 def test_move_relative_enc(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
-    controller.move_relative_enc(5000)
+    controller.move_relative_enc('5000 counts')
 
     fake = fake_serial['instance']
     assert fake.written[-2] == b'PM,MN,MR5000,GO\r'
@@ -256,7 +305,15 @@ def test_move_relative_enc(fake_serial):
 
 def test_move_relative_mm(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
-    controller.move_relative_mm(5)
+    controller.move_relative_mm('5 mm')
+
+    fake = fake_serial['instance']
+    assert fake.written[-2] == b'PM,MN,MR5000,GO\r'
+    assert fake.written[-1] == b'WS25\r'
+
+def test_move_relative(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.move_relative(5 * ureg.mm)
 
     fake = fake_serial['instance']
     assert fake.written[-2] == b'PM,MN,MR5000,GO\r'
@@ -296,6 +353,15 @@ def test_get_position_um(fake_serial):
     pos = controller.get_position_um()
     assert pos == 1000
 
+def test_get_position(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'1000\r')
+    pos = controller.get_position()
+    print(pos)
+    assert pos.to(ureg.mm).magnitude == 1
+
 def test_get_params(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
 
@@ -312,7 +378,7 @@ def test_softland_no_macro(fake_serial):
     fake = fake_serial['instance']
     fake.queue_response(b'')
 
-    controller.softland(limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+    controller.softland(limit='5 mm', duty=0.1, velocity='2 mm/s', acceleration='5000 mm/s**2')
 
     fake = fake_serial['instance']
     assert fake.written[-5] == b'TM500\r'
@@ -327,7 +393,7 @@ def test_softland_existing_macro(fake_serial):
     fake = fake_serial['instance']
     fake.queue_response(b'MD500,VM,MN,SQ3276,SA13107,SV26214,DI0,GO,WA200')
 
-    controller.softland(limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+    controller.softland(limit='5 mm', duty=0.1, velocity='2 mm/s', acceleration='5000 mm/s**2')
 
     fake = fake_serial['instance']
     assert fake.written[-2] == b'TM500\r'
@@ -339,7 +405,7 @@ def test_softland_force(fake_serial):
     fake = fake_serial['instance']
     fake.queue_response(b'MD0,MC100')
 
-    controller.softland(force=True, limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+    controller.softland(force=True, limit='5 mm', duty=0.1, velocity='2 mm/s', acceleration='5000 mm/s**2')
 
     fake = fake_serial['instance']
     assert fake.written[-5] == b'TM500\r'
@@ -354,7 +420,7 @@ def test_softland_no_execute(fake_serial):
     fake = fake_serial['instance']
     fake.queue_response(b'')
 
-    controller.softland(execute=False, limit=5, duty=0.1, mmpersecond=2, mmpersecondsquared=5000)
+    controller.softland(execute=False, limit='5 mm', duty=0.1, velocity='2 mm/s', acceleration='5000 mm/s**2')
 
     fake = fake_serial['instance']
     assert fake.written[-4] == b'TM500\r'
