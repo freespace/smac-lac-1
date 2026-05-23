@@ -2,7 +2,7 @@
 import serial
 import time
 from dataclasses import dataclass, field, astuple
-from units import set_units, ensure_units
+from .units import set_units, ensure_units
 
 # it is important to make these floats to avoid integer truncation error
 ENC_COUNTS_PER_MM = '1000.0 counts/mm'  # default encoder counts per mm
