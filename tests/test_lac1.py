@@ -372,6 +372,16 @@ def test_get_params(fake_serial):
     assert fake.written[-1] == b'TK10\r'
     assert param[0] == 'Version XXX'
 
+def test_get_time(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+
+    fake = fake_serial['instance']
+    fake.queue_response(b'12345\r')
+
+    time = controller.get_time()
+    assert fake.written[-1] == b'RL1830\r'
+    assert time == 12.345 * ureg.s
+
 def test_softland_no_macro(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
 

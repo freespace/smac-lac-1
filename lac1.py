@@ -584,6 +584,17 @@ class LAC1(object):
     """
     return self.sendcmds('TK', paramset)
   
+  def get_time(self):
+    """
+    Returns the current time in milliseconds since the controller was turned 
+    on.  Time is read from the 1 mS real time clock/counter at address 1830.
+    """
+    ret = self.sendcmds('RL1830')
+    if len(ret) > 0:
+      return set_units(float(ret[0]), 'ms')
+    else:
+      return None
+  
   def softland(self, force=False, execute=True, limit='10 mm', duty=0.9, velocity='4 mm/s', acceleration='10000 mm/s**2'):
     """
     This function executes a softland move. Details are derived from SMAC-MCA 
