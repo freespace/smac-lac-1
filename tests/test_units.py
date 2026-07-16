@@ -1,6 +1,6 @@
 import pytest
 
-from units import ureg, ensure_units, has_units
+from smac_python.units import ureg, ensure_units, has_units
 
 def test_has_units_true():
     assert has_units(10 * ureg.mm) == True

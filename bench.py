@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-from lac1 import LAC1
+from smac_python.lac1 import LAC1
 
 from getport import getport
 lac1 = LAC1(getport(), baudRate=19200)

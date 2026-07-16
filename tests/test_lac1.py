@@ -1,10 +1,10 @@
 import pytest
-from fakes import FakeSerial
-from units import ureg
+from .fakes import FakeSerial
+from smac_python.units import ureg
 
 @pytest.fixture
 def fake_serial(monkeypatch):
-    import lac1
+    import smac_python.lac1 as lac1
 
     container = {'instance': None}
 
@@ -21,7 +21,7 @@ def fake_serial(monkeypatch):
     )
     return container
 
-from lac1 import LAC1
+from smac_python.lac1 import LAC1
 def test_init(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
 

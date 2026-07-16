@@ -1,9 +1,9 @@
 import pytest
-from fakes import FakeSerial
+from .fakes import FakeSerial
 
 @pytest.fixture
 def fake_serial(monkeypatch):
-    import lac1
+    import smac_python.lac1 as lac1
 
     container = {'instance': None}
 
@@ -22,7 +22,7 @@ def fake_serial(monkeypatch):
 
 @pytest.fixture
 def actuator():
-    from lac1 import Actuator
+    from smac_python.lac1 import Actuator
     actuator = Actuator(
         enc_counts_per_mm='1000.0 counts/mm',
         stage_travel_mm='100.0 mm',
@@ -36,7 +36,7 @@ def actuator():
 
 @pytest.fixture
 def high_res_actuator():
-    from lac1 import Actuator
+    from smac_python.lac1 import Actuator
     actuator = Actuator(
         enc_counts_per_mm='5000.0 counts/mm',
         stage_travel_mm='100.0 mm',
@@ -48,7 +48,7 @@ def high_res_actuator():
 
     return actuator
 
-from lac1 import LAC1
+from smac_python.lac1 import LAC1
 
 # Unit tests to confrim properties from customer actuator are being used
 
