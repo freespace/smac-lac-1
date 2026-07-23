@@ -2,7 +2,10 @@
 import serial
 import time
 from dataclasses import dataclass, field, astuple
+from typing import Literal
+
 from .units import set_units, ensure_units
+from .data_capture import Data
 
 # it is important to make these floats to avoid integer truncation error
 ENC_COUNTS_PER_MM = '1000.0 counts/mm'  # default encoder counts per mm
@@ -659,6 +662,14 @@ class LAC1(object):
       print('Executing softland macro')
       msg = self.sendcmds('MS500')
       print(msg)
+  
+  def write_word(self, value, word):
+    self.sendcmds('AL', value, 'WW', word)
+    
+  Variable = Literal['position', 'error', 'current', 'sclock', 'rclock']
+  def setup_data_capture(self, time='5 s', rate='1000/s', 
+                         variables: list[Variable] = ['position'], units: list[str] = None):
+    return Data(controller=self, time=time, rate=rate, variables=variables, units=units)
 
   def close(self):
     if self._port:
