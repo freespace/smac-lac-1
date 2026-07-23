@@ -21,7 +21,8 @@ class Data(object):
         rate = ensure_units(rate, '1/s')
    
         self._controller = controller
-        self._samples = (time * rate).magnitude
+        # Round up number of samples to ensure enough allocation
+        self._samples = int(np.ceil((time * rate).magnitude))
         self._memorySpace = self._samples * num
         self._variables = variables
         self._units = []

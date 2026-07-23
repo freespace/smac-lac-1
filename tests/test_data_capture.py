@@ -51,6 +51,19 @@ def test_setup_data_capture_to_many(fake_serial):
     with pytest.raises(ValueError):
         controller.setup_data_capture(variables = ['position', 'position', 'position', 'position', 'position'])
 
+def test_setup_data_capture_fractional_counts(fake_serial):
+    controller = LAC1(port='COM_TEST', baudRate=9600)
+    controller.setup_data_capture(time='9.5 s', rate='1/s', variables=['current', 'position'])
+
+    fake = fake_serial['instance']
+    assert fake.written[-7] == b'CS20\r'
+    assert fake.written[-6] == b'AL5000,WW422\r'
+    assert fake.written[-5] == b'AL2,WW1600\r'
+    assert fake.written[-4] == b'AL548,WW1602\r'
+    assert fake.written[-3] == b'AL2,WW1604\r'
+    assert fake.written[-2] == b'AL494,WW1606\r'
+    assert fake.written[-1] == b'AL0,WW1608\r'
+
 def test_capture_data(fake_serial):
     controller = LAC1(port='COM_TEST', baudRate=9600)
 
