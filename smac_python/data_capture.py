@@ -1,10 +1,28 @@
+from enum import Enum
+
 import numpy as np
 from typing import Union
 
 from .units import ensure_units, set_units, Quantity
 
-class Data(object):
-    def __init__(self, controller, time: Union[int, float, str, Quantity], rate: Union[int, float, str, Quantity], variables: list[str], units: list[str] | None = None):
+# from User Manual section Internal Variables
+class DataVariable(Enum):
+    POSITION = (494,0,'mm')     # Curp LONG 01EEH/0494 
+    ERROR = (538,2,'mm')        # PERR WORD 021AH/0538 
+    CURRENT = (548,2,'A')       # IMON WORD 0224H/0548 
+    SCLOCK = (1826,0,'ms')      # SCLOCK LONG 0722H/1826 
+    RCLOCK = (1830,0,'ms')      # RCLOCK LONG 0726H/1830 
+
+    def __str__(self):
+            return self.name.lower()
+
+    def __init__(self, address, size, unit):
+        self.address = address
+        self.size = size
+        self.unit = unit
+
+class DataCapture(object):
+    def __init__(self, controller, time: Union[int, float, str, Quantity], rate: Union[int, float, str, Quantity], variables: list[DataVariable], units: list[str] | None = None):
         if not variables:
             raise ValueError('At least one variable must be defined')
         self._num = len(variables)
@@ -31,33 +49,13 @@ class Data(object):
         self._controller.write_word((self._controller.servo_loop_frequency / self._rate).magnitude, 422)
         self._controller.write_word(self._num, 1600)
 
-        for idx, variable in enumerate(self._variables):
-            match variable:
-                case 'position':
-                    word = 494
-                    size = 0
-                    unit = units[idx] or 'mm'
-                case 'error':
-                    word = 538
-                    size = 2
-                    unit = units[idx] or 'mm'
-                case 'current':
-                    word = 548
-                    size = 2
-                    unit = units[idx] or 'A'
-                case 'sclock':
-                    word = 1826
-                    size = 0
-                    unit = units[idx] or 'ms'
-                case 'rclock':
-                    word = 1830
-                    size = 0
-                    unit = units[idx] or 'ms'
-                case _:
-                    raise ValueError(f'Incorrect variable name: {variable}')
-            self._controller.write_word(word, 1602 + 4*idx)
-            self._controller.write_word(size, 1604 + 4*idx)
-            self._units.append(unit)
+        for idx, data_variable in enumerate(self._variables):
+            if not data_variable:
+                raise ValueError(f'Incorrect variable name: {data_variable}')
+            
+            self._controller.write_word(data_variable.address, 1602 + 4*idx)
+            self._controller.write_word(data_variable.size, 1604 + 4*idx)
+            self._units.append(units[idx] or data_variable.unit)
 
     def capture(self):
         self._controller.sendcmds('CD', self._memorySpace)
@@ -69,11 +67,11 @@ class Data(object):
             time = ensure_units(time, 's')
             memory = int(np.ceil((time * self._rate).magnitude)) * self._num
         
-        raw_data = {name: [] for name in self._variables}
+        raw_data = {str(variable): [] for variable in self._variables}
 
         def log(line):
-            for name, val in zip(self._variables, line.split(',')):
-                raw_data[name].append(int(val))
+            for variable, val in zip(self._variables, line.split(',')):
+                raw_data[str(variable)].append(int(val))
 
         self._controller.sendcmds('DD', memory, wait=True, callback=log)
         return {name: np.array(vals) for name, vals in raw_data.items()}
@@ -86,13 +84,13 @@ class Data(object):
 
         for idx, variable in enumerate(self._variables):
             match variable:
-                case 'position' | 'error':
-                    raw_data[variable] = set_units(raw_data[variable], 'counts') / self._controller.actuator.enc_counts_per_mm
-                case 'current':
-                    raw_data[variable] = raw_data[variable] * set_units(11.585, 'A')  / 2047
-                case 'sclock':
-                    raw_data[variable] = raw_data[variable] / self._controller.servo_loop_frequency
-                case 'rclock':
-                    raw_data[variable] = set_units(raw_data[variable], 'ms')
-            response[variable] = ensure_units(raw_data[variable], self._units[idx])
+                case DataVariable.POSITION | DataVariable.ERROR:
+                    raw_data[str(variable)] = set_units(raw_data[str(variable)], 'counts') / self._controller.actuator.enc_counts_per_mm
+                case DataVariable.CURRENT:
+                    raw_data[str(variable)] = raw_data[str(variable)] * set_units(11.585, 'A')  / 2047
+                case DataVariable.SCLOCK:
+                    raw_data[str(variable)] = raw_data[str(variable)] / self._controller.servo_loop_frequency
+                case DataVariable.RCLOCK:
+                    raw_data[str(variable)] = set_units(raw_data[str(variable)], 'ms')
+            response[str(variable)] = ensure_units(raw_data[str(variable)], self._units[idx])
         return response
