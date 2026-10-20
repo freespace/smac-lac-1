@@ -379,7 +379,7 @@ def test_get_time(fake_serial):
     fake.queue_response(b'12345\r')
 
     time = controller.get_time()
-    assert fake.written[-1] == b'RL1830\r'
+    assert fake.written[-1] == b'RL1830,TR0\r'
     assert time == 12.345 * ureg.s
 
 def test_softland_no_macro(fake_serial):

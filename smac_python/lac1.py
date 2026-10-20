@@ -592,7 +592,7 @@ class LAC1(object):
     Returns the current time in milliseconds since the controller was turned 
     on.  Time is read from the 1 mS real time clock/counter at address 1830.
     """
-    ret = self.sendcmds('RL1830')
+    ret = self.sendcmds('RL',1830,'TR',0)
     if len(ret) > 0:
       return set_units(float(ret[0]), 'ms')
     else:
